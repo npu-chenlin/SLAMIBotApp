@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #file-info {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #555;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <h1>文件上传</h1>
+    <div class="upload-container">
+        <input type="file" id="file-input">
+        <div id="file-info"></div>
+        <button id="upload-btn" disabled>上传文件</button>
+        
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar">
+                <div class="progress" id="progress-bar"></div>
+            </div>
+            <div id="progress-text">0%</div>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const fileInfo = document.getElementById('file-info');
+        const resultDiv = document.getElementById('result');
+        
+        let selectedFile = null;
+        
+        // 文件选择处理
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                uploadBtn.disabled = false;
+                fileInfo.textContent = `已选择: ${file.name} (${formatFileSize(file.size)})`;
+            } else {
+                selectedFile = null;
+                uploadBtn.disabled = true;
+                fileInfo.textContent = '';
+            }
+        });
+        
+        // 上传按钮点击处理
+        uploadBtn.addEventListener('click', () => {
+            if (selectedFile) {
+                uploadFile(selectedFile);
+            }
+        });
+        
+        // 文件上传函数
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // 显示进度条
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+            uploadBtn.disabled = true;
+            resultDiv.textContent = '';
+            resultDiv.className = '';
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'http://192.168.1.11:3001/upload', true);
+            
+            // 上传进度处理
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.textContent = percent + '%';
+                }
+            };
+            
+            // 上传完成处理
+            xhr.onload = () => {
+                progressContainer.style.display = 'none';
+                uploadBtn.disabled = false;
+                
+                if (xhr.status === 200) {
+                    resultDiv.textContent = '文件上传成功！';
+                    resultDiv.className = 'success';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        console.log('上传成功:', response);
+                    } catch (e) {
+                        console.log('上传成功:', xhr.responseText);
+                    }
+                } else {
+                    resultDiv.textContent = `上传失败: ${xhr.statusText}`;
+                    resultDiv.className = 'error';
+                    console.error('上传失败:', xhr.status, xhr.statusText);
+                }
+            };
+            
+            // 错误处理
+            xhr.onerror = () => {
+                progressContainer.style.display = 'none';
+                uploadBtn.disabled = false;
+                resultDiv.textContent = '上传过程中发生错误';
+                resultDiv.className = 'error';
+                console.error('上传错误:', xhr.statusText);
+            };
+            
+            // 发送请求
+            xhr.send(formData);
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

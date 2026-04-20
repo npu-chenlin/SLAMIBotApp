@@ -1,0 +1,282 @@
+.gimbal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.gimbal-modal {
+  width: 85%;
+  max-width: 420px;
+  background: #222;
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.gimbal-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #444;
+}
+
+.gimbal-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.gimbal-tab {
+  background: #333;
+  border: none;
+  color: #aaa;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.gimbal-tab:first-child {
+  border-top-left-radius: 6px;
+}
+
+.gimbal-tab:last-child {
+  border-top-right-radius: 6px;
+}
+
+.gimbal-tab:hover {
+  background: #3a3a3a;
+  color: #ccc;
+}
+
+.gimbal-tab.active {
+  background: #4CAF50;
+  color: #fff;
+  border-bottom-color: #4CAF50;
+}
+
+.gimbal-tab.active:hover {
+  background: #45a049;
+}
+
+.gimbal-close-button {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.gimbal-close-button:hover {
+  color: #fff;
+}
+
+.gimbal-section { padding: 14px 16px; }
+
+.gimbal-main-content {
+  padding: 16px;
+}
+
+.gimbal-flight-tab {
+  max-width: 350px;
+  margin: 0 auto;
+  padding: 10px 0;
+}
+
+.gimbal-control-tab {
+  display: flex;
+  gap: 25px;
+  justify-content: center;
+  align-items: center;
+}
+
+.gimbal-joystick-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.gimbal-values-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 120px;
+}
+
+
+.gimbal-control-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.gimbal-control-title {
+  color: #ccc;
+  font-size: 14px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.gimbal-fields { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.gimbal-row { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: space-between; }
+.gimbal-row label { color: #ccc; white-space: nowrap; min-width: 100px; text-align: left; font-weight: 500; flex: 0 0 100px; }
+.gimbal-row input[type="number"] { background: #2b2b2b; border: 1px solid #3f3f3f; color: #fff; border-radius: 6px; padding: 8px 10px; width: 120px; flex: 0 0 120px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.gimbal-row input[type="number"]:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15); }
+
+.gimbal-actions { display: flex; justify-content: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+
+.gimbal-start-button,
+.gimbal-stop-button,
+.gimbal-cancel-button,
+.gimbal-zero-button { border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-weight: 600; min-width: 70px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); transition: transform 0.06s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+
+.gimbal-start-button { background: #2ecc71; color: #fff; }
+.gimbal-start-button:hover { background: #28b765; }
+.gimbal-stop-button { background: #e74c3c; color: #fff; }
+.gimbal-stop-button:hover { background: #cf4435; }
+.gimbal-zero-button { background: #ff9800; color: #fff; }
+.gimbal-zero-button:hover { background: #f57c00; }
+.gimbal-cancel-button { background: #616161; color: #fff; }
+.gimbal-cancel-button:hover { background: #555; }
+
+.gimbal-start-button:active,
+.gimbal-stop-button:active,
+.gimbal-zero-button:active,
+.gimbal-cancel-button:active { transform: translateY(1px); filter: brightness(0.98); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+
+/* 云台控制区域样式 */
+.gimbal-joystick-container {
+  width: 180px;
+  height: 180px;
+  border: 2px solid #444;
+  border-radius: 50%;
+  position: relative;
+  background: radial-gradient(circle, #2a2a2a 0%, #1a1a1a 100%);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.gimbal-joystick-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 2px;
+  background: #666;
+  transform: translate(-50%, -50%);
+}
+
+.gimbal-joystick-center::before,
+.gimbal-joystick-center::after {
+  content: '';
+  position: absolute;
+  background: #666;
+}
+
+.gimbal-joystick-center::before {
+  width: 160px;
+  height: 1px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.gimbal-joystick-center::after {
+  width: 1px;
+  height: 160px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.gimbal-joystick-handle {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  background: #4CAF50;
+  border: 2px solid #2e7d32;
+  border-radius: 50%;
+  cursor: grab;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+
+.gimbal-joystick-handle:active {
+  cursor: grabbing;
+  background: #66BB6A;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.gimbal-values-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gimbal-value-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #1a1a1a;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  min-width: 90px;
+}
+
+.gimbal-value-label {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.gimbal-value-number {
+  font-size: 16px;
+  color: #4CAF50;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .gimbal-main-content {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .gimbal-joystick-container {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .gimbal-joystick-center::before {
+    width: 130px;
+  }
+  
+  .gimbal-joystick-center::after {
+    height: 130px;
+  }
+}
+
+@media (max-width: 420px) {
+  .gimbal-row { flex: 1 1 100%; min-width: 0; }
+}
+
+

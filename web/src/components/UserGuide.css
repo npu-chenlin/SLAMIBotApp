@@ -1,0 +1,257 @@
+/* 添加全局样式确保html和body有明确的高度 */
+html, body, #root {
+  height: 100% !important;
+  width: 100% !important;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+.user-guide-page {
+  min-height: 100vh; /* 保留vh单位作为备用 */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* 增强iOS滚动体验 */
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overscroll-behavior: contain; /* 防止滚动链接到父元素 */
+  touch-action: pan-y; /* 允许垂直平移 */
+}
+
+.guide-container {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  position: relative;
+  max-width: 800px;
+  width: 100%;
+  margin: 20px 0;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.header .back-button {
+  margin-right: 15px;
+}
+
+.header h1 {
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 24px;
+  flex: 1;
+}
+
+.header p {
+  color: #7f8c8d;
+  margin: 0;
+  font-size: 14px;
+  width: 100%;
+}
+
+.section {
+  margin-bottom: 25px;
+}
+
+.section h2 {
+  color: #2c3e50;
+  font-size: 18px;
+  margin: 0 0 15px 0;
+  display: flex;
+  align-items: center;
+}
+
+.section h2::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin-right: 10px;
+  border-radius: 2px;
+}
+
+.step {
+  background: #f8f9fa;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+}
+
+.step-number {
+  display: inline-block;
+  background: #3498db;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 24px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+.tip {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 10px 0;
+}
+
+.tip::before {
+  content: '💡 ';
+  font-size: 16px;
+}
+
+.user-guide-warning {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 10px 0;
+}
+
+.user-guide-warning::before {
+  content: '⚠️ ';
+  font-size: 16px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.feature-item {
+  background: #e8f4fd;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #bee5eb;
+  transition: transform 0.2s ease;
+}
+
+.feature-item:hover {
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.feature-title {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 5px;
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+  color: #7f8c8d;
+  font-size: 12px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .user-guide-page {
+    padding: 10px;
+    -webkit-tap-highlight-color: transparent; /* 移除点击高亮 */
+  }
+  
+  .guide-container {
+    padding: 20px;
+    margin: 10px 0;
+    border-radius: 8px; /* 减小圆角半径 */
+  }
+  
+  .header {
+    margin-top: 0;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header h1 {
+    font-size: 20px;
+  }
+  
+  .section h2 {
+    font-size: 16px;
+  }
+  
+  /* 增强触摸区域大小 */
+  .back-button {
+    padding: 10px 15px;
+    min-height: 44px; /* 确保触摸目标足够大 */
+  }
+}
+
+@media (max-width: 480px) {
+  .guide-container {
+    padding: 15px;
+  }
+  
+  .step {
+    padding: 12px;
+  }
+  
+  .feature-item {
+    padding: 12px;
+  }
+}
+
+/* 针对Android WebView的特定优化 */
+@supports (-webkit-overflow-scrolling: touch) {
+  .user-guide-page {
+    height: 100vh;
+    position: relative;
+  }
+  
+  body {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+/* 添加触摸设备的滚动优化 */
+@media (pointer: coarse) {
+  .user-guide-page {
+    scroll-behavior: smooth;
+  }
+  
+  .step, .feature-item, .tip, .user-guide-warning {
+    touch-action: pan-y; /* 允许垂直平移 */
+  }
+}
