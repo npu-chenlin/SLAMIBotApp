@@ -583,7 +583,12 @@ const View = () => {
         <div
           className={`panorama-preview ${isImageMaximized ? "maximized" : ""}`}
           ref={panoramaPreviewRef}
-          onClick={() => setIsImageMaximized(!isImageMaximized)}
+          onClick={() => {
+            if (panoramaPreviewRef.current) {
+              panoramaPreviewRef.current.style.width = "";
+            }
+            setIsImageMaximized((v) => !v);
+          }}
         >
           {<canvas className="panorama-image" ref={keyframeCanvasRef}></canvas>}
           {/* <div className="panorama-image">
