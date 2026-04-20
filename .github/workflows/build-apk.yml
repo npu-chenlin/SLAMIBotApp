@@ -56,7 +56,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > app/slamibot_app.jks
+          echo "$KEYSTORE_BASE64" | base64 -d > app/app/slamibot_app.jks
 
       - name: Build Release APK
         working-directory: app
