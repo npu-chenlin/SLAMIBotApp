@@ -1,19 +1,24 @@
 #!/bin/bash
 
-# SLAMIBotApp 统一构建脚本
-# 完整流水线：安装依赖 -> 编译 Web -> 复制到 App -> 编译 APK -> 上传
+# SLAMIBotApp 统一构建脚本（Tag-Driven）
+# 版本号的唯一真相来源是 GitHub 上的最新 tag
 #
 # 用法:
 #   ./build.sh [major|minor|patch]
 #   默认递增 patch 版本号
 #
-# 环境变量:
-#   UPLOAD_SERVER_URL   - 上传服务器地址 (可选，不设置则跳过上传)
-#   UPLOAD_AUTH_TOKEN   - 上传授权 Token (可选)
+# 流程:
+#   1. 从远程获取最新 tag 作为基准版本
+#   2. 按参数递增版本号
+#   3. 更新 version.properties 和 web/package.json
+#   4. 构建 APK
+#   5. git commit + tag + push（触发 GitHub Action）
 
 set -e
 
-# 解析版本递增参数
+# -----------------------------------------------------------
+# 参数解析
+# -----------------------------------------------------------
 BUMP_TYPE="${1:-patch}"
 if [[ "$BUMP_TYPE" != "major" && "$BUMP_TYPE" != "minor" && "$BUMP_TYPE" != "patch" ]]; then
     echo "Usage: $0 [major|minor|patch]"
@@ -23,16 +28,35 @@ if [[ "$BUMP_TYPE" != "major" && "$BUMP_TYPE" != "minor" && "$BUMP_TYPE" != "pat
     exit 1
 fi
 
-# 读取当前版本号
-CURRENT_VERSION=$(grep "VERSION_NAME" version.properties | cut -d'=' -f2)
-CURRENT_VERSION_CODE=$(grep "VERSION_CODE" version.properties | cut -d'=' -f2)
+# -----------------------------------------------------------
+# 1. 从远程获取最新 tag 作为基准版本
+# -----------------------------------------------------------
+echo "Fetching latest tag from remote..."
+LATEST_TAG=$(git ls-remote --tags origin 2>/dev/null \
+    | grep "refs/tags/v" \
+    | awk -F/ '{print $NF}' \
+    | sed 's/\^{}//' \
+    | sort -V \
+    | tail -1)
 
-# 解析 major.minor.patch
+if [ -z "$LATEST_TAG" ]; then
+    echo "Error: No version tag found on remote. Please create the first tag manually."
+    echo "  git tag v1.0.0"
+    echo "  git push origin v1.0.0"
+    exit 1
+fi
+
+# 去掉 v 前缀
+CURRENT_VERSION="${LATEST_TAG#v}"
+echo "  Latest remote tag: $LATEST_TAG (version $CURRENT_VERSION)"
+
+# -----------------------------------------------------------
+# 2. 解析并递增版本号
+# -----------------------------------------------------------
 MAJOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f1)
 MINOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f2)
 PATCH=$(echo "$CURRENT_VERSION" | cut -d'.' -f3)
 
-# 递增版本号
 case "$BUMP_TYPE" in
     major)
         MAJOR=$((MAJOR + 1))
@@ -49,28 +73,42 @@ case "$BUMP_TYPE" in
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+NEW_TAG="v${NEW_VERSION}"
 
+echo ""
 echo "========================================"
 echo "Version bump: $CURRENT_VERSION -> $NEW_VERSION ($BUMP_TYPE)"
-echo "Version code: $CURRENT_VERSION_CODE -> $NEW_VERSION_CODE"
+echo "New tag: $NEW_TAG"
 echo "========================================"
 
-# 更新 version.properties
+# -----------------------------------------------------------
+# 3. 同步更新本地版本文件
+# -----------------------------------------------------------
+# 读取当前 VERSION_CODE
+CURRENT_VERSION_CODE=$(grep "VERSION_CODE" version.properties | cut -d'=' -f2)
+NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+
 cat > version.properties <<EOF
 VERSION_NAME=$NEW_VERSION
 VERSION_CODE=$NEW_VERSION_CODE
 EOF
 
 # 更新 web/package.json
-# macOS 和 Linux 都兼容的 sed 方式
 if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" web/package.json
 else
     sed -i "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" web/package.json
 fi
 
-# 自动设置 Android Studio 内置 JDK（如果没有设置 JAVA_HOME）
+# -----------------------------------------------------------
+# 4. 构建 APK
+# -----------------------------------------------------------
+echo ""
+echo "========================================"
+echo "Building SLAMIBotApp $NEW_TAG"
+echo "========================================"
+
+# 自动设置 Android Studio 内置 JDK
 if [ -z "$JAVA_HOME" ]; then
     if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then
         export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -81,12 +119,6 @@ if [ -z "$JAVA_HOME" ]; then
     fi
 fi
 
-echo ""
-echo "========================================"
-echo "Building SLAMIBotApp v$NEW_VERSION"
-echo "========================================"
-
-# 设置路径变量
 REACT_PROJECT_PATH="web"
 ANDROID_PROJECT_PATH="app"
 ANDROID_ASSETS_PATH="app/app/src/main/assets/web"
@@ -99,7 +131,6 @@ if [ ! -d "node_modules" ]; then
     npm install
 else
     echo "  -> node_modules exists, skipping npm install."
-    echo "  -> (Run 'npm install' manually if you need to update dependencies)"
 fi
 
 # [2/4] 编译 React 项目
@@ -131,38 +162,23 @@ if [ -f "$APK_ORIGINAL" ]; then
     echo "  -> $APK_RENAMED"
 fi
 
-# 上传到服务器
+# -----------------------------------------------------------
+# 5. 提交版本变更并推送
+# -----------------------------------------------------------
 echo ""
-if [ -n "$UPLOAD_SERVER_URL" ] && [ -n "$UPLOAD_AUTH_TOKEN" ]; then
-    echo "Uploading APK to server..."
+echo "Committing version bump and pushing to remote..."
+git add version.properties web/package.json
+git commit -m "release: bump version to $NEW_TAG"
+git tag "$NEW_TAG"
+git push origin HEAD
+git push origin "$NEW_TAG"
 
-    # 生成 changelog
-    DESC_FILE=$(mktemp)
-    echo "SLAMIBot Android App v$NEW_VERSION" > "$DESC_FILE"
-    echo "" >> "$DESC_FILE"
-    echo "最近更新：" >> "$DESC_FILE"
-    git log --oneline -n 5 | sed 's/^/- /' >> "$DESC_FILE"
+echo "  -> Commit pushed"
+echo "  -> Tag $NEW_TAG pushed"
 
-    HTTP_CODE=$(curl -s -X POST "$UPLOAD_SERVER_URL" \
-        -H "Authorization: Bearer $UPLOAD_AUTH_TOKEN" \
-        -F "category=app" \
-        -F "description=<$DESC_FILE" \
-        -F "release_date=$(date +%Y-%m-%d)" \
-        -F "file=@$APK_RENAMED" \
-        -o /dev/null -w "%{http_code}")
-
-    rm -f "$DESC_FILE"
-
-    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-        echo "  -> Upload successful (HTTP $HTTP_CODE)"
-    else
-        echo "  -> Upload failed (HTTP $HTTP_CODE)"
-        exit 1
-    fi
-else
-    echo "Skipping upload (UPLOAD_SERVER_URL or UPLOAD_AUTH_TOKEN not set)"
-fi
-
+# -----------------------------------------------------------
+# 完成
+# -----------------------------------------------------------
 echo ""
 echo "========================================"
 echo "Build completed successfully!"
@@ -170,4 +186,6 @@ echo "========================================"
 echo ""
 echo "APK output:"
 echo "  $APK_RENAMED"
+echo ""
+echo "GitHub Action will be triggered by tag $NEW_TAG"
 echo ""
