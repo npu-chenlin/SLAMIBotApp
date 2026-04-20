@@ -81,3 +81,15 @@ jobs:
         with:
           name: slamibot-v${{ steps.version.outputs.version }}
           path: ${{ env.apk_path }}
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ steps.version.outputs.version }}
+          name: SLAMIBot v${{ steps.version.outputs.version }}
+          artifacts: ${{ env.apk_path }}
+          generateReleaseNotes: true
+          makeLatest: true
+          allowUpdates: true
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
