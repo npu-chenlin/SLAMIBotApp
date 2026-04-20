@@ -18,6 +18,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    'this.ROSLIB': 'globalThis.ROSLIB',
+  },
   build: {
     outDir: 'build',
   },
