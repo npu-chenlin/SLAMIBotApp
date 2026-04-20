@@ -61,8 +61,8 @@ const DownloadCenter: React.FC<DownloadCenterProps> = ({ preloadedVersion }) => 
   };
 
   useEffect(() => {
-    // 获取当前App版本号（从package.json中读取）
-    const localAppVersion = import.meta.env.VITE_VERSION || "0.1.0";
+    // 获取当前App版本号
+    const localAppVersion = import.meta.env.VITE_CURRENT_VERSION || "1.0.0";
     setCurrentAppVersion(localAppVersion);
 
     // 模拟获取当前固件版本
