@@ -21,7 +21,7 @@ import { customAlert, customPrompt } from "./utils/customAlert";
 // 根据环境变量获取ROS服务器地址，如果未设置则使用默认值
 const DEFAULT_ROS_SERVER = process.env.REACT_APP_ROS_SERVER || "192.168.2.131";
 // 当前App版本
-const CURRENT_APP_VERSION = process.env.REACT_APP_CURRENT_VERSION || "1.0.2";
+const CURRENT_APP_VERSION = process.env.REACT_APP_CURRENT_VERSION || "1.5.0";
 
 console.log(
   "当前ROS服务器地址:",

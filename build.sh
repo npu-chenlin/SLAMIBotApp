@@ -9,14 +9,17 @@ set -e
 REACT_PROJECT_PATH="web"
 ANDROID_ASSETS_PATH="app/app/src/main/assets/web"
 
+# 读取统一版本号
+VERSION_NAME=$(grep "VERSION_NAME" version.properties | cut -d'=' -f2)
+
 echo "========================================"
-echo "Building SLAMIBotApp"
+echo "Building SLAMIBotApp v$VERSION_NAME"
 echo "========================================"
 
 # 构建 React 项目
 echo "[1/3] Building React project..."
 cd "$REACT_PROJECT_PATH"
-npm run build:release
+REACT_APP_CURRENT_VERSION="$VERSION_NAME" npm run build:release
 cd -
 
 # 确保 Android assets 目录存在
