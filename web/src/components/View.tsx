@@ -593,88 +593,88 @@ const View = () => {
           </div> */}
         </div>
 
-        {/* 右侧功能按钮 */}
-        <div className="right-controls">
-          {/* 添加状态按钮 */}
-          <button
-            // className={`status-button ${
-            //   (systemStatus.lidar.status === "active" || systemStatus.cam.status === "active")
-            //     ? "stop"
-            //     : elapsedTime > 0.001 && elapsedTime < 60
-            //     ? "waiting"
-            //     : "start"
-            // }`}
-            className={`status-button ${
-              isSaving
-                ? "waiting"
-                : (systemStatus.slam.status === "active" || elapsedTime > 0.001)
-                ? "stop"
-                : "start"
-            }`}
-            onClick={() => {
-              const buttonClass = (systemStatus.slam.status === "active" || elapsedTime > 0.001)
-                ? "stop"
-                : "start";
+      </div>
 
-              if (buttonClass === "start") {
-                console.log("开始操作");
-                toggleRecording(true);
-              } else if (buttonClass === "stop") {
-                console.log("停止操作");
+      {/* 右侧功能按钮 */}
+      <div className="right-controls">
+        {/* 添加状态按钮 */}
+        <button
+          // className={`status-button ${
+          //   (systemStatus.lidar.status === "active" || systemStatus.cam.status === "active")
+          //     ? "stop"
+          //     : elapsedTime > 0.001 && elapsedTime < 60
+          //     ? "waiting"
+          //     : "start"
+          // }`}
+          className={`status-button ${
+            isSaving
+              ? "waiting"
+              : (systemStatus.slam.status === "active" || elapsedTime > 0.001)
+              ? "stop"
+              : "start"
+          }`}
+          onClick={() => {
+            const buttonClass = (systemStatus.slam.status === "active" || elapsedTime > 0.001)
+              ? "stop"
+              : "start";
 
-                // 设置为等待状态
-                setIsSaving(true);
+            if (buttonClass === "start") {
+              console.log("开始操作");
+              toggleRecording(true);
+            } else if (buttonClass === "stop") {
+              console.log("停止操作");
 
-                toggleRecording(false).finally(() => {
-                  // 恢复正常状态
-                  setIsSaving(false);
-                });
-              } else {
-                console.log("系统正在准备中，执行停止操作");
-                toggleRecording(false);
-              }
-            }}
-          >
-            <span className="status-icon"></span>
-          </button>
-           {/* 添加切换相机视角按钮 */}
-           <button
-            className={`camera-mode-button ${cameraMode}`}
-            onClick={toggleCameraMode}
-            title={
-              cameraMode === "firstPerson"
-                ? "切换到第三人称视角"
-                : "切换到自由模式"
+              // 设置为等待状态
+              setIsSaving(true);
+
+              toggleRecording(false).finally(() => {
+                // 恢复正常状态
+                setIsSaving(false);
+              });
+            } else {
+              console.log("系统正在准备中，执行停止操作");
+              toggleRecording(false);
             }
-          >
-            <span className="camera-mode-icon">
-              {cameraMode === "firstPerson" ? (
-                <div className="eye-icon"></div>
-              ) : (
-                <div className="video-icon"></div>
-              )}
-            </span>
-          </button>
+          }}
+        >
+          <span className="status-icon"></span>
+        </button>
+         {/* 添加切换相机视角按钮 */}
+         <button
+          className={`camera-mode-button ${cameraMode}`}
+          onClick={toggleCameraMode}
+          title={
+            cameraMode === "firstPerson"
+              ? "切换到第三人称视角"
+              : "切换到自由模式"
+          }
+        >
+          <span className="camera-mode-icon">
+            {cameraMode === "firstPerson" ? (
+              <div className="eye-icon"></div>
+            ) : (
+              <div className="video-icon"></div>
+            )}
+          </span>
+        </button>
 
-          {/* <button
-            className={`record-button ${isRecording ? "recording" : ""}`}
-            onClick={toggleRecording}
-          >
-            <span className="record-icon"></span>
-          </button> */}
-          {/* <button className="location-button">
-            <span className="location-icon"></span>
-          </button> */}
-          {shouldShowGimbalControl() && (
-            <button className="gimbal-button" onClick={openGimbalModal}> 
-              <span className="gimbal-icon"></span>
-            </button>
-          )}
-          <button className="camera-control-button" onClick={openCameraControlModal} title="相机控制">
-            <span className="camera-control-icon"></span>
+        {/* <button
+          className={`record-button ${isRecording ? "recording" : ""}`}
+          onClick={toggleRecording}
+        >
+          <span className="record-icon"></span>
+        </button> */}
+        {/* <button className="location-button">
+          <span className="location-icon"></span>
+        </button> */}
+        {shouldShowGimbalControl() && (
+          <button className="gimbal-button" onClick={openGimbalModal}> 
+            <span className="gimbal-icon"></span>
           </button>
-         
-        </div>
+        )}
+        <button className="camera-control-button" onClick={openCameraControlModal} title="相机控制">
+          <span className="camera-control-icon"></span>
+        </button>
       </div>
 
       {/* 底部进度条 */}
