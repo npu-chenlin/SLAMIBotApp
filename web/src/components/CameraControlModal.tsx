@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useContext } from "react";
 import "./CameraControlModal.css";
 import rosService from "../services/ROSService";
 import { ROSContext } from "../App";
-import ROSLIB from "roslib";
+import * as ROSLIB from "roslib";
 
 interface CameraControlModalProps {
   isOpen: boolean;

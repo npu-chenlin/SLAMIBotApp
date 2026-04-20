@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
 import * as THREE from "three";
-import ROSLIB from "roslib";
+import * as ROSLIB from "roslib";
 import * as ROS3D from "ros3d";
 // DebugPanel 已移至 View.tsx
 import "./PointCloud.css";

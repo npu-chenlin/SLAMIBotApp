@@ -1,4 +1,4 @@
-import ROSLIB from 'roslib';
+import * as ROSLIB from 'roslib';
 
 // 定义ROS连接状态类型
 export type ROSConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';

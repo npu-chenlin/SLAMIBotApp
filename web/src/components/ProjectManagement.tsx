@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./ProjectManagement.css";
 import rosService from "../services/ROSService";
 import { customAlert, customConfirm } from "../utils/customAlert";
-import ROSLIB from "roslib";
+import * as ROSLIB from "roslib";
 
 interface Project {
   id: number | string;
