@@ -362,7 +362,7 @@
 
 /* 右侧功能按钮 */
 .right-controls {
-  position: absolute;
+  position: absolute !important;
   right: 16px;
   top: calc(50% - 20px);
   transform: translateY(-50%);
@@ -521,7 +521,7 @@
 
 @media (max-width: 480px) {
   .left-controls, .right-controls {
-    position: static;
+    position: absolute !important;
     transform: none;
     display: flex;
     justify-content: space-around;
