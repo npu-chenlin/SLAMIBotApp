@@ -80,6 +80,7 @@ const View = () => {
   const keyframeCanvasRef = useRef<HTMLCanvasElement>(null);
   const panoramaPreviewRef = useRef<HTMLDivElement>(null);
   const pointCloudRef = useRef<PointCloudRef>(null); // 添加PointCloud组件的引用
+  const hasSetPreviewWidthRef = useRef(false);
 
   // 监听ROS连接状态变化
   useEffect(() => {
@@ -197,11 +198,12 @@ const View = () => {
                     ctx?.drawImage(image, 0, 0, image.width, image.height);
 
                     // 根据图像长宽比动态调整预览窗口宽度（高度保持不变）
-                    if (panoramaPreviewRef.current && !panoramaPreviewRef.current.classList.contains("maximized")) {
+                    if (panoramaPreviewRef.current && !panoramaPreviewRef.current.classList.contains("maximized") && !hasSetPreviewWidthRef.current) {
                       const container = panoramaPreviewRef.current;
                       const containerHeight = container.clientHeight;
                       const aspectRatio = image.width / image.height;
                       container.style.setProperty("--preview-width", `${Math.round(containerHeight * aspectRatio)}px`);
+                      hasSetPreviewWidthRef.current = true;
                     }
                   };
                 }
