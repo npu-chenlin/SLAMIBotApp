@@ -43,7 +43,7 @@ jobs:
       - name: Build web
         working-directory: web
         env:
-          REACT_APP_CURRENT_VERSION: ${{ steps.version.outputs.version }}
+          VITE_CURRENT_VERSION: ${{ steps.version.outputs.version }}
         run: npm run build:release
 
       - name: Copy web build to Android assets

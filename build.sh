@@ -41,7 +41,7 @@ fi
 
 # [2/4] 编译 React 项目
 echo "[2/4] Building React project..."
-REACT_APP_CURRENT_VERSION="$VERSION_NAME" npm run build:release
+VITE_CURRENT_VERSION="$VERSION_NAME" npm run build:release
 cd -
 
 # [3/4] 复制构建产物到 Android assets
