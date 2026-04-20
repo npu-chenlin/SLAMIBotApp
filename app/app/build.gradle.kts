@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val versionProperties = java.util.Properties().apply {
+    file("../../version.properties").inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.example.metacam"
     compileSdk = 35
@@ -12,8 +16,8 @@ android {
         applicationId = "com.example.metacam"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.5"
+        versionCode = versionProperties.getProperty("VERSION_CODE").toInt()
+        versionName = versionProperties.getProperty("VERSION_NAME")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -25,9 +29,19 @@ android {
     //    }
     // }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("/Users/lin/slamibot_app.jks")
+            storePassword = "slamibot123"
+            keyAlias = "slamibot_app"
+            keyPassword = "slamibot123"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

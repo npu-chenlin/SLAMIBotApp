@@ -1,2 +1,29 @@
-app/app/src/main/assets/web/
+# macOS
 .DS_Store
+
+# Web build artifacts copied to Android assets
+app/app/src/main/assets/web/
+
+# Node.js
+node_modules/
+web/node_modules/
+web/build/
+
+# Android
+app/.gradle/
+app/build/
+app/app/build/
+app/local.properties
+*.apk
+*.hprof
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# Environment
+.env.local
