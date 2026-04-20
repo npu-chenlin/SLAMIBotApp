@@ -64,6 +64,7 @@ const View = () => {
   const [isCameraControlModalOpen, setIsCameraControlModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deviceType, setDeviceType] = useState<string | null>(null);
+  const [isImageMaximized, setIsImageMaximized] = useState(false);
 
   // useContext
   const { connectToROS, disconnectROS, rosServerIp } = useContext(ROSContext);
@@ -196,7 +197,7 @@ const View = () => {
                     ctx?.drawImage(image, 0, 0, image.width, image.height);
 
                     // 根据图像长宽比动态调整预览窗口宽度（高度保持不变）
-                    if (panoramaPreviewRef.current) {
+                    if (panoramaPreviewRef.current && !panoramaPreviewRef.current.classList.contains("maximized")) {
                       const container = panoramaPreviewRef.current;
                       const containerHeight = container.clientHeight;
                       const aspectRatio = image.width / image.height;
@@ -440,10 +441,6 @@ const View = () => {
     // 这里可以添加将配置保存到后端或本地存储的逻辑
   };
 
-  function closePanoramaPreview(e: any): void {
-    console.log("关闭全景预览", e);
-  }
-
   return (
     <div className="view-container">
       {/* 顶部状态栏 */}
@@ -583,15 +580,11 @@ const View = () => {
         {/* <div className="center-marker"></div> */}
 
         {/* 全景预览窗口 */}
-        <div className="panorama-preview" ref={panoramaPreviewRef}>
-          <button
-            className="close-preview"
-            onClick={(e: any) => {
-              closePanoramaPreview(e);
-            }}
-          >
-            ✕
-          </button>
+        <div
+          className={`panorama-preview ${isImageMaximized ? "maximized" : ""}`}
+          ref={panoramaPreviewRef}
+          onClick={() => setIsImageMaximized(!isImageMaximized)}
+        >
           {<canvas className="panorama-image" ref={keyframeCanvasRef}></canvas>}
           {/* <div className="panorama-image">
             {<canvas id="panorama"></canvas>}
