@@ -155,8 +155,25 @@
   color: #ff9b90;
 }
 
-.satellite-count {
-  min-width: 48px;
+.satellite-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.satellite-icon {
+  font-size: 14px;
+  color: #fff;
+}
+
+.satellite-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
   font-variant-numeric: tabular-nums;
 }
 

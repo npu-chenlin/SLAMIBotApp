@@ -12,6 +12,8 @@ import * as ROSLIB from "roslib";
 import { customPrompt } from "../utils/customAlert"; // 导入customPrompt
 import GimbalControlModal from "./GimbalControlModal";
 import CameraControlModal from "./CameraControlModal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSatellite } from "@fortawesome/free-solid-svg-icons";
 
 // 标准 ROS sensor_msgs/NavSatFix 消息类型
 type RtkGnssMessage = {
@@ -506,9 +508,15 @@ const View = () => {
             <span className={`status-value rtk-status-chip ${rtkStatus}`}>
               {rtkStatus}
             </span>
-            <span className="status-value satellite-count">
-              {satelliteCount !== null ? `${satelliteCount} 星` : "-- 星"}
-            </span>
+            <div className="satellite-icon-wrapper">
+              <FontAwesomeIcon
+                icon={faSatellite}
+                className="satellite-icon"
+              />
+              <span className="satellite-badge">
+                {satelliteCount !== null ? satelliteCount : "0"}
+              </span>
+            </div>
           </div>
           {/* <div className="status-item">
             <div className="signal-strength">
