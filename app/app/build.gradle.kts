@@ -4,9 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val versionProperties = java.util.Properties().apply {
-    file("../../version.properties").inputStream().use { load(it) }
-}
+// 读取根目录版本号文件
+val versionLines = file("../../version.properties").readLines()
+val versionName = versionLines.find { it.startsWith("VERSION_NAME=") }?.substringAfter("=") ?: "1.0.0"
+val versionCode = versionLines.find { it.startsWith("VERSION_CODE=") }?.substringAfter("=")?.toInt() ?: 1
 
 android {
     namespace = "com.example.metacam"
@@ -16,18 +17,11 @@ android {
         applicationId = "com.example.metacam"
         minSdk = 29
         targetSdk = 35
-        versionCode = versionProperties.getProperty("VERSION_CODE").toInt()
-        versionName = versionProperties.getProperty("VERSION_NAME")
+        this.versionCode = versionCode
+        this.versionName = versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
-    // Add sourceSets configuration for assets
-    // sourceSets {
-    //    getByName("main") {
-    //        assets.srcDirs("src/main/assets", "../web/build")
-    //    }
-    // }
 
     signingConfigs {
         create("release") {

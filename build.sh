@@ -56,11 +56,23 @@ cd "$ANDROID_PROJECT_PATH"
 ./gradlew app:assembleRelease
 cd -
 
+# 重命名 APK
+echo ""
+echo "Renaming APK..."
+APK_DIR="$ANDROID_PROJECT_PATH/app/build/outputs/apk/release"
+APK_ORIGINAL="$APK_DIR/app-release.apk"
+APK_RENAMED="$APK_DIR/slamibot_v${VERSION_NAME}.apk"
+
+if [ -f "$APK_ORIGINAL" ]; then
+    mv "$APK_ORIGINAL" "$APK_RENAMED"
+    echo "  -> $APK_RENAMED"
+fi
+
 echo ""
 echo "========================================"
 echo "Build completed successfully!"
 echo "========================================"
 echo ""
 echo "APK output:"
-echo "  $ANDROID_PROJECT_PATH/app/build/outputs/apk/release/app-release.apk"
+echo "  $APK_RENAMED"
 echo ""
