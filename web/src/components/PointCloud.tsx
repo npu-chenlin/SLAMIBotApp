@@ -470,7 +470,8 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
       console.info("当前环境支持 Web Worker");
 
       let worker = new Worker(
-        new URL("../workers/pointCloudParser.worker.ts", import.meta.url)
+        new URL("../workers/pointCloudParser.worker.ts", import.meta.url),
+        { type: 'module' }
       );
 
       // console.log(
