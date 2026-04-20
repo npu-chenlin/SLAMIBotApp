@@ -201,7 +201,7 @@ const View = () => {
                       const container = panoramaPreviewRef.current;
                       const containerHeight = container.clientHeight;
                       const aspectRatio = image.width / image.height;
-                      container.style.width = `${Math.round(containerHeight * aspectRatio)}px`;
+                      container.style.setProperty("--preview-width", `${Math.round(containerHeight * aspectRatio)}px`);
                     }
                   };
                 }
@@ -585,7 +585,7 @@ const View = () => {
           ref={panoramaPreviewRef}
           onClick={() => {
             if (panoramaPreviewRef.current) {
-              panoramaPreviewRef.current.style.width = "";
+              panoramaPreviewRef.current.style.removeProperty("--preview-width");
             }
             setIsImageMaximized((v) => !v);
           }}
