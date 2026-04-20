@@ -76,6 +76,16 @@ jobs:
           echo "APK output: $APK_RENAMED"
           echo "apk_path=$APK_RENAMED" >> "$GITHUB_ENV"
 
+      - name: Upload APK to server
+        run: |
+          curl -s -X POST "${{ secrets.UPLOAD_SERVER_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.UPLOAD_AUTH_TOKEN }}" \
+            -F "category=app" \
+            -F "description=SLAMIBot Android App v${{ steps.version.outputs.version }}" \
+            -F "release_date=$(date +%Y-%m-%d)" \
+            -F "file=@${{ env.apk_path }}" \
+            -w "\nHTTP_CODE: %{http_code}\n"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
