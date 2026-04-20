@@ -25,10 +25,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("/Users/lin/slamibot_app.jks")
-            storePassword = "slamibot123"
-            keyAlias = "slamibot_app"
-            keyPassword = "slamibot123"
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "/Users/lin/slamibot_app.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "slamibot123"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "slamibot_app"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "slamibot123"
         }
     }
 
