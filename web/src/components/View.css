@@ -360,6 +360,7 @@
   background-size: cover;
   background-position: center;
   /* background-color: #4CAF50; */
+  object-fit: contain;
 }
 
 /* 右侧功能按钮 */
