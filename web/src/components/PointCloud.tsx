@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
 import * as THREE from "three";
 import * as ROSLIB from "roslib";
-import * as ROS3D from "ros3d";
 // DebugPanel 已移至 View.tsx
 import "./PointCloud.css";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
@@ -12,63 +11,6 @@ import FrameRateController from "../utils/FrameRateController";
 import FPSCounter from "../utils/FPSCounter";
 import rosService from "../services/ROSService";
 import * as Util from "../utils/util";
-
-ROS3D.PointCloud2.prototype.processMessage = function (msg) {
-  return;
-  console.time("processMessage");
-  if (!this.points.setup(msg.header.frame_id, msg.point_step, msg.fields)) {
-    return;
-  }
-
-  var n,
-    pointRatio = this.points.pointRatio;
-  var bufSz = this.max_pts * msg.point_step;
-
-  if (msg.data.buffer) {
-    this.buffer = msg.data.slice(0, Math.min(msg.data.byteLength, bufSz));
-    n = Math.min(
-      (msg.height * msg.width) / pointRatio,
-      this.points.positions.array.length / 3
-    );
-  } else {
-    if (!this.buffer || this.buffer.byteLength < bufSz) {
-      this.buffer = new Uint8Array(bufSz);
-    }
-    n = Util.decode64(msg.data, this.buffer, msg.point_step, pointRatio);
-    pointRatio = 1;
-  }
-
-  var dv = new DataView(this.buffer.buffer);
-  var littleEndian = !msg.is_bigendian;
-  var x = this.points.fields.x.offset;
-  var y = this.points.fields.y.offset;
-  var z = this.points.fields.z.offset;
-  var base, color;
-  console.log(n);
-  for (var i = 0; i < n; i++) {
-    base = i * pointRatio * msg.point_step;
-    this.points.positions.array[3 * i] = dv.getFloat32(base + x, littleEndian);
-    this.points.positions.array[3 * i + 1] = dv.getFloat32(
-      base + y,
-      littleEndian
-    );
-    this.points.positions.array[3 * i + 2] = dv.getFloat32(
-      base + z,
-      littleEndian
-    );
-
-    if (this.points.colors) {
-      color = this.points.colormap(
-        this.points.getColor(dv, base, littleEndian)
-      );
-      this.points.colors.array[3 * i] = color.r;
-      this.points.colors.array[3 * i + 1] = color.g;
-      this.points.colors.array[3 * i + 2] = color.b;
-    }
-  }
-  this.points.update(n);
-  console.timeEnd("processMessage");
-};
 
 interface PointCloudProps {
   url: string;
@@ -367,16 +309,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           transThres: 0.01,
         });
 
-        // 使用ROS3D处理点云数据
-        const ros = rosService.getROSInstance();
-        if (ros) {
-          new ROS3D.PointCloud2({
-            ros: ros!,
-            topic: topic,
-            tfClient: tfClientRef.current,
-            max_pts: 100000,
-          });
-        }
+        // 点云数据通过 ros?.on(topic, ...) 直接处理并渲染，不需要 ros3d
       }
     } catch (error) {
       console.error("设置电池状态订阅时出错:", error);

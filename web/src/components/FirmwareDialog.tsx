@@ -9,7 +9,6 @@ declare global {
   interface Window {
     Android?: {
       getDownloadedFirmwareFiles: () => string;
-      uploadFirmware: (filePath: string) => boolean;
       readFileContent: (filePath: string) => any;
       uploadFile: (filePath: string, serverUrl: string) => any;
     };
@@ -37,22 +36,16 @@ function FirmwareDialog({
   currentAppVersion,
 }: FirmwareDialogProps) {
   const [appLatestVersion, setAppLatestVersion] = useState("0.0.0"); // 默认版本，将通过API更新
-  const [appDownloadStarted, setAppDownloadStarted] = useState(false);
-  const [appDownloadProgress, setAppDownloadProgress] = useState(0);
+  const [appLatestFilename, setAppLatestFilename] = useState("");
   const [firmwareDownloadStarted, setFirmwareDownloadStarted] = useState(false);
   const [firmwareDownloadProgress, setFirmwareDownloadProgress] = useState(0);
   const [firmwareUploadStarted, setFirmwareUploadStarted] = useState(false);
   const [firmwareUploadProgress, setFirmwareUploadProgress] = useState(0);
-  const [localFirmwareFiles, setLocalFirmwareFiles] = useState<string[]>([]);
   const [localLatestVersion, setLocalLatestVersion] = useState<string>("");
-  const [selectedFirmwareFile, setSelectedFirmwareFile] = useState<{
-    name?: string;
-    path?: string;
-    size?: number;
-    lastModified?: Date;
-  }>({});
+  const [localFirmwarePath, setLocalFirmwarePath] = useState<string>("");
 
   const [hardwareLatestVersion, setHardwareLatestVersion] = useState("0.0.0"); // 默认固件版本，将通过API更新
+  const [hardwareLatestFilename, setHardwareLatestFilename] = useState("");
   const [firmwareVersion, setFirmwareVersion] = useState("未知"); // 设备固件版本
   // useContext
   const { connectToROS, disconnectROS, rosServerIp } = useContext(ROSContext);
@@ -65,41 +58,9 @@ function FirmwareDialog({
       // 自动获取设备固件版本
       getFirmwareVersion();
     }
-  }, [isOpen, selectedFirmwareFile]);
+  }, [isOpen]);
 
-  // 模拟下载进度
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (appDownloadStarted && appDownloadProgress < 100) {
-      interval = setInterval(() => {
-        setAppDownloadProgress((prev) => {
-          const newProgress = prev + 5;
-          return newProgress > 100 ? 100 : newProgress;
-        });
-      }, 300);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [appDownloadStarted, appDownloadProgress]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (firmwareDownloadStarted && firmwareDownloadProgress < 100) {
-      interval = setInterval(() => {
-        setFirmwareDownloadProgress((prev) => {
-          const newProgress = prev + 5;
-          return newProgress > 100 ? 100 : newProgress;
-        });
-      }, 300);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [firmwareDownloadStarted, firmwareDownloadProgress]);
+  // 固件下载进度由 Android native 回调驱动，不模拟
 
   // 清理上传状态
   useEffect(() => {
@@ -279,11 +240,26 @@ function FirmwareDialog({
     }
   }, [isOpen, fetchVersions]);
 
+  // 语义化版本号比较：a < b 返回负数，a === b 返回 0，a > b 返回正数
+  const compareVersions = (a: string, b: string): number => {
+    const aParts = a.split(".").map(Number);
+    const bParts = b.split(".").map(Number);
+    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+      const aPart = aParts[i] || 0;
+      const bPart = bParts[i] || 0;
+      if (aPart !== bPart) return aPart - bPart;
+    }
+    return 0;
+  };
+
   // 处理APP下载
   const handleAppDownload = () => {
-    // setAppDownloadStarted(true);
+    if (!appLatestFilename) {
+      customAlert("暂无可用App版本", "提示");
+      return;
+    }
     window.open(
-      `http://101.42.4.41:5001/download/app/slamibot_v${appLatestVersion}.apk`
+      `http://101.42.4.41:5001/download/app/${appLatestFilename}`
     );
   };
 
@@ -315,11 +291,14 @@ function FirmwareDialog({
 
   // 处理固件下载
   const handleFirmwareDownload = () => {
+    if (!hardwareLatestFilename || hardwareLatestVersion === "0.0.0") {
+      customAlert("暂无可用固件版本", "提示");
+      return;
+    }
     window.open(
-      `http://101.42.4.41:5001/download/hardware/slamibotfull_v${hardwareLatestVersion}.ibot`
+      `http://101.42.4.41:5001/download/hardware/${hardwareLatestFilename}`
     );
     setFirmwareDownloadStarted(true);
-    // 这里可以添加实际的固件下载逻辑
   };
 
   // 获取设备固件版本
@@ -354,106 +333,59 @@ function FirmwareDialog({
       // 获取最新的设备版本
       const currentDeviceVersion = await getFirmwareVersion();
       
-      // 判断是否需要更新
-      if (currentDeviceVersion !== localLatestVersion && localLatestVersion) {
-        console.log("设备固件版本与预载版本不一致，准备上传最新固件");
+      // 判断是否需要更新：设备版本 < 本地预载版本才更新
+      if (compareVersions(currentDeviceVersion, localLatestVersion) < 0 && localLatestVersion) {
+        console.log("设备固件版本低于预载版本，准备上传最新固件");
         // 开始固件上传
-        await performFirmwareUpload(currentDeviceVersion);
+        await performFirmwareUpload();
       } else {
         customAlert("设备固件已是最新版本，无需更新", "提示");
       }
     } catch (error: any) {
       console.error("固件更新检查失败:", error);
+      customAlert("固件更新检查失败，请重试", "错误");
     }
   };
 
   // 处理固件上传逻辑
-  const performFirmwareUpload = async (deviceVersion: string) => {
+  const performFirmwareUpload = async () => {
     try {
-      // 查找最新的预载固件文件
-      if (localFirmwareFiles.length > 0) {
-        const selectedFile: any = localFirmwareFiles.find((file: any) =>
-          file.name.includes(`v${localLatestVersion}`)
-        );
-        if (selectedFile) {
-          setSelectedFirmwareFile(selectedFile);
-          console.log("自动选择最新固件文件:", selectedFile.path);
+      const Android = getAndroid();
+      if (!Android) {
+        customAlert("Android接口未定义", "错误");
+        return;
+      }
 
-          // 开始执行上传逻辑
-          setFirmwareUploadStarted(true);
+      if (!localFirmwarePath) {
+        customAlert("未找到本地固件文件，请先下载预载固件", "提示");
+        return;
+      }
 
-          // 使用选择的本地固件文件进行上传
-          if (
-            selectedFile &&
-            selectedFile.name &&
-            selectedFile.size &&
-            selectedFile.path &&
-            window.Android
-          ) {
-            console.log(`开始上传本地固件文件: ${selectedFile.path}`);
+      setFirmwareUploadStarted(true);
+      setFirmwareUploadProgress(0);
 
-            // 调用原生代码执行上传
-            var serverUrl = `http://${rosServerIp}:5001/upload`;
-            console.log("开始上传文件到服务器:", serverUrl);
+      const fileName = localFirmwarePath.split('/').pop() || 'firmware.ibot';
+      window.onUploadStart && window.onUploadStart(fileName, 0);
 
-            // 触发上传开始事件，创建UI
-            window.onUploadStart &&
-              window.onUploadStart(selectedFile.name, selectedFile.size);
+      const serverUrl = `http://${rosServerIp}:5001/upload`;
+      console.log("开始上传文件到服务器:", serverUrl);
 
-            // 调用原生代码执行上传
-            const result = window.Android.uploadFile(
-              selectedFile.path,
-              serverUrl
-            );
+      const result = Android.uploadFile(localFirmwarePath, serverUrl);
 
-            if (!result) {
-              console.error("启动上传任务失败");
-              setFirmwareUploadStarted(false);
-            }
-          } else {
-            console.error("上传参数不完整或Android接口不可用");
-            setFirmwareUploadStarted(false);
-          }
-        } else {
-          console.error("未找到对应版本的固件文件");
-        }
-      } else {
-        console.error("没有可用的本地固件文件");
+      if (!result) {
+        console.error("启动上传任务失败");
+        setFirmwareUploadStarted(false);
+        setFirmwareUploadProgress(0);
       }
     } catch (error: any) {
       console.error("固件上传失败:", error);
       setFirmwareUploadStarted(false);
+      setFirmwareUploadProgress(0);
+      customAlert("固件上传失败", "错误");
     }
   };
 
 
-
-  const handleFirmwareUpload = async () => {};
-
-  // 处理选择固件文件
-  const handleSelectFirmware = (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const selectedFileName = event.target.value;
-
-    console.log("选择固件文件:", selectedFileName);
-
-    if (selectedFileName) {
-      // 从文件列表中找到对应的文件信息
-      const selectedFile: any = localFirmwareFiles.find(
-        (file: any) => file.name === selectedFileName
-      );
-      console.log("上传文件路径:", selectedFile.path);
-      setSelectedFirmwareFile(selectedFile);
-    } else {
-      setSelectedFirmwareFile({
-        name: "",
-        path: "",
-        size: 0,
-        lastModified: new Date(),
-      });
-    }
-  };
 
   // 获取App最新版本信息
   const fetchAppLatestVersion = async () => {
@@ -462,6 +394,7 @@ function FirmwareDialog({
       const data = await response.json();
       if (data && data.latest_version) {
         setAppLatestVersion(data.latest_version);
+        setAppLatestFilename(data.filename);
         console.log("获取到App最新版本:", data.latest_version);
       }
     } catch (error) {
@@ -476,6 +409,7 @@ function FirmwareDialog({
       const data = await response.json();
       if (data && data.latest_version) {
         setHardwareLatestVersion(data.latest_version);
+        setHardwareLatestFilename(data.filename);
         console.log("获取到固件最新版本:", data.latest_version);
       }
     } catch (error) {
@@ -491,92 +425,45 @@ function FirmwareDialog({
         return;
       }
 
-      console.log("Android接口可用，尝试获取固件文件列表...");
-
-      try {
-        // 获取已下载的固件文件列表
-        const firmwareFilesJson = Android.getDownloadedFirmwareFiles();
-        console.log("预载固件列表:", firmwareFilesJson);
-
-        if (!firmwareFilesJson) {
-          console.error("获取预载固件列表失败: 返回空数据");
-          return;
-        }
-
-        let firmwareFiles = JSON.parse(firmwareFilesJson);
-        console.log("预载固件列表数组:", firmwareFiles);
-
-        if (!Array.isArray(firmwareFiles)) {
-          console.error("预载固件列表格式错误: 不是数组");
-          return;
-        }
-
-        // 确保每个文件都有必要的属性
-        firmwareFiles = firmwareFiles.map((file) => {
-          if (typeof file === "string") {
-            // 如果文件是字符串，转换为对象
-            return {
-              name: file,
-              path: file, // 假设路径与文件名相同
-              size: 0,
-              lastModified: Date.now(),
-            };
-          }
-          return file;
-        });
-
-        setLocalFirmwareFiles(firmwareFiles);
-
-        // 提取最新版本号
-        if (firmwareFiles && firmwareFiles.length > 0) {
-          // 假设文件名格式为 slamibotfull_v1.2.3.ibot
-          const versionRegex = /slamibotfull_v([0-9]+\.[0-9]+\.[0-9]+)\.ibot/;
-
-          // 提取所有版本号
-          const versions = firmwareFiles
-            .map((file: any) => {
-              const match = file.name.match(versionRegex);
-              return match ? match[1] : null;
-            })
-            .filter((version: string) => version !== null) as string[];
-
-          if (versions.length > 0) {
-            // 对版本号进行排序，获取最新版本
-            const latestVersion = versions.sort((a, b) => {
-              const aParts = a.split(".").map(Number);
-              const bParts = b.split(".").map(Number);
-
-              for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-                const aPart = aParts[i] || 0;
-                const bPart = bParts[i] || 0;
-
-                if (aPart !== bPart) {
-                  return bPart - aPart; // 降序排列
-                }
-              }
-
-              return 0;
-            })[0];
-
-            console.log("本地最新固件版本:", latestVersion);
-
-            setLocalLatestVersion(latestVersion);
-
-            // 如果没有选择文件，默认选择最新版本对应的文件
-            if (!selectedFirmwareFile) {
-              const latestFile = firmwareFiles.find((file: any) =>
-                file.name.includes(`v${latestVersion}`)
-              );
-              if (latestFile) {
-                setSelectedFirmwareFile(latestFile);
-                console.log("自动选择最新固件文件:", latestFile);
-              }
-            }
-          }
-        }
-      } catch (parseError) {
-        console.error("解析固件文件列表失败:", parseError);
+      const firmwareFilesJson = Android.getDownloadedFirmwareFiles();
+      if (!firmwareFilesJson) {
+        console.error("获取预载固件列表失败: 返回空数据");
+        return;
       }
+
+      const firmwareFiles = JSON.parse(firmwareFilesJson);
+      if (!Array.isArray(firmwareFiles) || firmwareFiles.length === 0) {
+        console.error("预载固件列表为空");
+        return;
+      }
+
+      // 从多个固件中提取版本号并排序，取最新的一份
+      const versionRegex = /slamibot(?:full)?_v([0-9]+\.[0-9]+\.[0-9]+)\.ibot/;
+      const filesWithVersion = firmwareFiles
+        .map((file: any) => {
+          const match = file.name.match(versionRegex);
+          return match ? { file, version: match[1] } : null;
+        })
+        .filter(Boolean) as Array<{ file: any; version: string }>;
+
+      if (filesWithVersion.length === 0) {
+        console.error("未从预载固件中提取到有效版本号");
+        return;
+      }
+
+      // 按版本号降序排列，取最新
+      const latest = filesWithVersion.sort((a, b) => {
+        const aParts = a.version.split(".").map(Number);
+        const bParts = b.version.split(".").map(Number);
+        for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+          const diff = (bParts[i] || 0) - (aParts[i] || 0);
+          if (diff !== 0) return diff;
+        }
+        return 0;
+      })[0];
+
+      setLocalLatestVersion(latest.version);
+      setLocalFirmwarePath(latest.file.path);
     } catch (error) {
       console.error("获取本地固件文件列表失败:", error);
     }
@@ -701,64 +588,25 @@ function FirmwareDialog({
                   </div>
                   <div>
                     {currentAppVersion !== appLatestVersion ? (
-                      appDownloadStarted ? (
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <div
-                            style={{
-                              width: "120px",
-                              backgroundColor: "#e9ecef",
-                              height: "10px",
-                              borderRadius: "5px",
-                              overflow: "hidden",
-                              marginRight: "8px",
-                              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.1)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${appDownloadProgress}%`,
-                                height: "100%",
-                                backgroundColor: "#2196f3",
-                                backgroundImage:
-                                  "linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)",
-                                backgroundSize: "20px 20px",
-                                animation:
-                                  "progress-bar-stripes 1s linear infinite",
-                                transition: "width 0.3s",
-                              }}
-                            ></div>
-                          </div>
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#555",
-                              fontWeight: "500",
-                            }}
-                          >
-                            {appDownloadProgress}%
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleAppDownload}
-                          style={{
-                            backgroundColor: "#2196f3",
-                            color: "white",
-                            border: "none",
-                            padding: "6px 12px",
-                            borderRadius: "5px",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            fontWeight: "500",
-                            boxShadow: "0 2px 4px rgba(33,150,243,0.3)",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span style={{ marginRight: "4px" }}>⬇️</span> 下载
-                        </button>
-                      )
+                      <button
+                        onClick={handleAppDownload}
+                        style={{
+                          backgroundColor: "#2196f3",
+                          color: "white",
+                          border: "none",
+                          padding: "6px 12px",
+                          borderRadius: "5px",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                          fontWeight: "500",
+                          boxShadow: "0 2px 4px rgba(33,150,243,0.3)",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span style={{ marginRight: "4px" }}>⬇️</span> 下载
+                      </button>
                     ) : (
                       <div
                         style={{
@@ -946,139 +794,95 @@ function FirmwareDialog({
                 </div>
               </div>
 
-              <div
-                style={{ marginTop: "15px", display: "flex", flexWrap: "wrap" }}
-              >
-                {/* 固件版本操作区域 - 优化布局 */}
+              {/* 固件上传进度 */}
+              {firmwareUploadStarted && (
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
+                    marginTop: "15px",
                     width: "100%",
-                    gap: "12px",
+                    backgroundColor: "#e8f5e9",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                    border: "1px solid #c8e6c9",
                   }}
                 >
-                  {/* 文件选择和上传区域 */}
-                  {localLatestVersion !== firmwareVersion ? (
-                    <div
+                  <div
+                    style={{
+                      marginBottom: "12px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        width: "100%",
-                        gap: "10px",
-                      }}
-                    >
-                      {/* 上传进度条 */}
-                      {firmwareUploadStarted && (
-                        <div
-                          style={{
-                            width: "100%",
-                            backgroundColor: "#e8f5e9",
-                            padding: "15px",
-                            borderRadius: "8px",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                            border: "1px solid #c8e6c9",
-                            marginTop: "15px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              marginBottom: "12px",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#2e7d32",
-                                fontWeight: "500",
-                                display: "flex",
-                                alignItems: "center",
-                              }}
-                            >
-                              <span style={{ marginRight: "8px" }}>📤</span>{" "}
-                              上传进度
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: "600",
-                                color: "#2e7d32",
-                                backgroundColor: "#c8e6c9",
-                                padding: "3px 8px",
-                                borderRadius: "12px",
-                              }}
-                            >
-                              {firmwareUploadProgress}%
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              backgroundColor: "#c8e6c9",
-                              height: "12px",
-                              borderRadius: "6px",
-                              overflow: "hidden",
-                              boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${firmwareUploadProgress}%`,
-                                height: "100%",
-                                backgroundColor: "#66AC58",
-                                backgroundImage:
-                                  "linear-gradient(45deg, rgba(255,255,255,.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.2) 75%, transparent 75%, transparent)",
-                                backgroundSize: "20px 20px",
-                                animation:
-                                  "progress-bar-stripes 1s linear infinite",
-                                transition: "width 0.3s ease",
-                                boxShadow: "0 0 5px rgba(102,172,88,0.5)",
-                              }}
-                            ></div>
-                          </div>
-                          <div
-                            style={{
-                              marginTop: "10px",
-                              fontSize: "13px",
-                              color: "#388e3c",
-                              textAlign: "center",
-                            }}
-                          >
-                            正在上传固件，请勿关闭应用...
-                          </div>
-                          <style>
-                            {`
-                              @keyframes progress-bar-stripes {
-                                from { background-position: 20px 0; }
-                                to { background-position: 0 0; }
-                              }
-                            `}
-                          </style>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        color: "#4caf50",
                         fontSize: "14px",
+                        color: "#2e7d32",
                         fontWeight: "500",
                         display: "flex",
                         alignItems: "center",
-                        backgroundColor: "#f1f8e9",
-                        padding: "10px 15px",
-                        borderRadius: "4px",
-                        marginTop: "5px",
                       }}
                     >
-                      <span style={{ marginRight: "8px" }}>✓</span>{" "}
-                      设备固件已是最新版本
-                    </div>
-                  )}
+                      <span style={{ marginRight: "8px" }}>📤</span> 上传进度
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        color: "#2e7d32",
+                        backgroundColor: "#c8e6c9",
+                        padding: "3px 8px",
+                        borderRadius: "12px",
+                      }}
+                    >
+                      {firmwareUploadProgress}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      backgroundColor: "#c8e6c9",
+                      height: "12px",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${firmwareUploadProgress}%`,
+                        height: "100%",
+                        backgroundColor: "#66AC58",
+                        backgroundImage:
+                          "linear-gradient(45deg, rgba(255,255,255,.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.2) 75%, transparent 75%, transparent)",
+                        backgroundSize: "20px 20px",
+                        animation:
+                          "progress-bar-stripes 1s linear infinite",
+                        transition: "width 0.3s ease",
+                        boxShadow: "0 0 5px rgba(102,172,88,0.5)",
+                      }}
+                    ></div>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      fontSize: "13px",
+                      color: "#388e3c",
+                      textAlign: "center",
+                    }}
+                  >
+                    正在上传固件，请勿关闭应用...
+                  </div>
+                  <style>
+                    {`
+                      @keyframes progress-bar-stripes {
+                        from { background-position: 20px 0; }
+                        to { background-position: 0 0; }
+                      }
+                    `}
+                  </style>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

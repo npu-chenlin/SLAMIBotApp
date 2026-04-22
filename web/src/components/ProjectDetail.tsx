@@ -190,7 +190,7 @@ const ProjectDetail: React.FC = () => {
           pointsCount: 1250000,
           description:
             "这是一个使用MetaCam采集的3D点云项目，包含完整的空间扫描数据。",
-          pointCloudUrl: `ws://{rosServerIp}:9090`,
+          pointCloudUrl: `ws://${rosServerIp}:9090`,
         };
 
         // 延迟模拟网络请求
