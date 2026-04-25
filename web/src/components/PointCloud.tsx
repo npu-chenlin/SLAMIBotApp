@@ -98,6 +98,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
   const firstPersonCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const odometryListenerRef = useRef<ROSLIB.Topic | null>(null);
+  const pointCloudTopicRef = useRef<ROSLIB.Topic | null>(null);
   // 添加轨迹点数组引用
   const trajectoryPointsRef = useRef<THREE.Vector3[]>([]);
   // 添加轨迹线对象引用
@@ -134,7 +135,10 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
     const ros = rosService.getROSInstance();
 
     // 订阅点云话题
-    ros?.on(topic, (msg: any) => {
+    pointCloudTopicRef.current = rosService.subscribeTopic(
+      topic,
+      'sensor_msgs/PointCloud2',
+      (msg: any) => {
       if (rosService.isConnected()) {
         if (workerRef.current) {
           workerRef.current.postMessage(msg);
@@ -212,7 +216,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           // console.timeEnd("renderPoints");
         }
       }
-    });
+    );
 
     try {
       if (rosService.isConnected()) {
@@ -309,7 +313,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           transThres: 0.01,
         });
 
-        // 点云数据通过 ros?.on(topic, ...) 直接处理并渲染，不需要 ros3d
+        // 点云数据通过 rosService.subscribeTopic 直接处理并渲染，不需要 ros3d
       }
     } catch (error) {
       console.error("设置电池状态订阅时出错:", error);
@@ -372,6 +376,11 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
   // 清理订阅
   const cleanupSubscribers = () => {
+    if (pointCloudTopicRef.current) {
+      rosService.unsubscribeTopic(pointCloudTopicRef.current);
+      pointCloudTopicRef.current = null;
+    }
+
     if (odometryListenerRef.current) {
       rosService.unsubscribeTopic(odometryListenerRef.current);
       odometryListenerRef.current = null;
