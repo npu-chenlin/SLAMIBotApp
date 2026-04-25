@@ -12,6 +12,61 @@ import FPSCounter from "../utils/FPSCounter";
 import rosService from "../services/ROSService";
 import * as Util from "../utils/util";
 import { getPointCloudData } from "../utils/util";
+import * as ROS3D from "ros3d";
+
+ROS3D.PointCloud2.prototype.processMessage = function (msg: any) {
+  return;
+  if (!this.points.setup(msg.header.frame_id, msg.point_step, msg.fields)) {
+    return;
+  }
+
+  var n: number,
+    pointRatio = this.points.pointRatio;
+  var bufSz = this.max_pts * msg.point_step;
+
+  if (msg.data.buffer) {
+    this.buffer = msg.data.slice(0, Math.min(msg.data.byteLength, bufSz));
+    n = Math.min(
+      (msg.height * msg.width) / pointRatio,
+      this.points.positions.array.length / 3
+    );
+  } else {
+    if (!this.buffer || this.buffer.byteLength < bufSz) {
+      this.buffer = new Uint8Array(bufSz);
+    }
+    n = (Util as any).decode64(msg.data, this.buffer, msg.point_step, pointRatio);
+    pointRatio = 1;
+  }
+
+  var dv = new DataView(this.buffer.buffer);
+  var littleEndian = !msg.is_bigendian;
+  var x = this.points.fields.x.offset;
+  var y = this.points.fields.y.offset;
+  var z = this.points.fields.z.offset;
+  var base: number, color: any;
+  for (var i = 0; i < n; i++) {
+    base = i * pointRatio * msg.point_step;
+    this.points.positions.array[3 * i] = dv.getFloat32(base + x, littleEndian);
+    this.points.positions.array[3 * i + 1] = dv.getFloat32(
+      base + y,
+      littleEndian
+    );
+    this.points.positions.array[3 * i + 2] = dv.getFloat32(
+      base + z,
+      littleEndian
+    );
+
+    if (this.points.colors) {
+      color = this.points.colormap(
+        this.points.getColor(dv, base, littleEndian)
+      );
+      this.points.colors.array[3 * i] = color.r;
+      this.points.colors.array[3 * i + 1] = color.g;
+      this.points.colors.array[3 * i + 2] = color.b;
+    }
+  }
+  this.points.update(n);
+};
 
 interface PointCloudProps {
   url: string;
@@ -99,7 +154,6 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
   const firstPersonCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const odometryListenerRef = useRef<ROSLIB.Topic | null>(null);
-  const pointCloudTopicRef = useRef<ROSLIB.Topic | null>(null);
   // 添加轨迹点数组引用
   const trajectoryPointsRef = useRef<THREE.Vector3[]>([]);
   // 添加轨迹线对象引用
@@ -136,10 +190,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
     const ros = rosService.getROSInstance();
 
     // 订阅点云话题
-    pointCloudTopicRef.current = rosService.subscribeTopic(
-      topic,
-      'sensor_msgs/PointCloud2',
-      (msg: any) => {
+    ros?.on(topic, (msg: any) => {
       if (rosService.isConnected()) {
         if (workerRef.current) {
           workerRef.current.postMessage(msg);
@@ -202,8 +253,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           // console.timeEnd("renderPoints");
         }
       }
-    }
-    );
+    });
 
     try {
       if (rosService.isConnected()) {
@@ -300,7 +350,16 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           transThres: 0.01,
         });
 
-        // 点云数据通过 rosService.subscribeTopic 直接处理并渲染，不需要 ros3d
+        // 使用ROS3D处理点云数据（订阅CBOR二进制流，触发ROSBridge推送）
+        const ros = rosService.getROSInstance();
+        if (ros) {
+          new ROS3D.PointCloud2({
+            ros: ros!,
+            topic: topic,
+            tfClient: tfClientRef.current,
+            max_pts: 100000,
+          });
+        }
       }
     } catch (error) {
       console.error("设置电池状态订阅时出错:", error);
@@ -363,11 +422,6 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
   // 清理订阅
   const cleanupSubscribers = () => {
-    if (pointCloudTopicRef.current) {
-      rosService.unsubscribeTopic(pointCloudTopicRef.current);
-      pointCloudTopicRef.current = null;
-    }
-
     if (odometryListenerRef.current) {
       rosService.unsubscribeTopic(odometryListenerRef.current);
       odometryListenerRef.current = null;
