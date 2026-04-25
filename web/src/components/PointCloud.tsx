@@ -11,6 +11,7 @@ import FrameRateController from "../utils/FrameRateController";
 import FPSCounter from "../utils/FPSCounter";
 import rosService from "../services/ROSService";
 import * as Util from "../utils/util";
+import { getPointCloudData } from "../utils/util";
 
 interface PointCloudProps {
   url: string;
@@ -146,9 +147,10 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           decodedWith = "worker: postMessage";
         } else {
           decodedWith = "no worker";
-          console.time("parsePointCloud");
+          const t0 = performance.now();
 
           const result = parsePointCloud(msg);
+          console.log("parsePointCloud took", performance.now() - t0, "ms");
 
           // 复制点数据到Float32Array
           const subStart = pointsLength,
@@ -506,12 +508,52 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
         workerRef.current = null;
 
         const workerScript = `
+        function decode64(inbytes, outbytes, record_size, pointRatio) {
+          var x, b = 0, l = 0, j = 0, L = inbytes.length, A = outbytes.length;
+          record_size = record_size || A;
+          pointRatio = pointRatio || 1;
+          var bitskip = (pointRatio - 1) * record_size * 8;
+          var S = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+          var e = {};
+          for (var i = 0; i < 64; i++) { e[S.charAt(i)] = i; }
+          for (x = 0; x < L && j < A; x++) {
+            b = (b << 6) + e[inbytes.charAt(x)];
+            l += 6;
+            if (l >= 8) {
+              l -= 8;
+              outbytes[j++] = (b >>> l) & 0xff;
+              if ((j % record_size) === 0) {
+                x += Math.ceil((bitskip - l) / 6);
+                l = l % 8;
+                if (l > 0) { b = e[inbytes.charAt(x)]; }
+              }
+            }
+          }
+          return Math.floor(j / record_size);
+        }
+        function getPointCloudData(msgData) {
+          if (msgData.buffer && msgData.buffer instanceof ArrayBuffer) {
+            return new Uint8Array(msgData.buffer, msgData.byteOffset, msgData.byteLength);
+          }
+          if (msgData instanceof ArrayBuffer) {
+            return new Uint8Array(msgData);
+          }
+          if (typeof msgData === 'string') {
+            var decoded = new Uint8Array(msgData.length * 3 / 4 + 4);
+            decode64(msgData, decoded, decoded.length, 1);
+            return decoded;
+          }
+          if (Array.isArray(msgData)) {
+            return new Uint8Array(msgData);
+          }
+          return new Uint8Array(msgData);
+        }
         function parsePointCloud(msg) {
-        var buffer = new Uint8Array(msg.data).buffer;
-        var dataView = new DataView(buffer);
-        var points = [];
-        var colors = [];
-        for (let i = 0; i < msg.width; i++) {
+          var bytes = getPointCloudData(msg.data);
+          var dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+          var points = [];
+          var colors = [];
+          for (let i = 0; i < msg.width; i++) {
             var pointOffset = i * msg.point_step;
             msg.fields.forEach((field) => {
                 var byteOffset = pointOffset + field.offset;
@@ -1050,8 +1092,8 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
   const parsePointCloud = (msg: any) => {
     console.log("not from web worker");
-    const buffer = new Uint8Array(msg.data).buffer;
-    const dataView = new DataView(buffer);
+    const bytes = getPointCloudData(msg.data);
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
     const points: number[] = [];
     const colors: number[] = [];
