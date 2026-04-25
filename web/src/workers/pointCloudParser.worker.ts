@@ -45,60 +45,58 @@ function getPointCloudData(msgData: any): Uint8Array {
 }
 
 const parsePointCloud = (msg: any) => {
-  // console.time('parsePointCloud');
   const bytes = getPointCloudData(msg.data);
-  const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const littleEndian = !msg.is_bigendian;
 
-  const points: number[] = [];
-  const colors: number[] = [];
-  const intensities: number[] = [];
-
-  for (let i = 0; i < msg.width; i++) {
-    const pointOffset = i * msg.point_step;
-
-    msg.fields.forEach((field: any) => {
-      const byteOffset = pointOffset + field.offset;
-      const name = field.name;
-
-      switch (field.datatype) {
-        case 7:  // FLOAT32 (x/y/z) // UINT32 (rgb)
-          if (name === 'x' || name === 'y' || name === 'z') {
-            points.push(dataView.getFloat32(byteOffset, !msg.is_bigendian));
-          } else if (name === 'rgb') {
-            const rgbInt = dataView.getUint32(byteOffset, !msg.is_bigendian);
-            const rgb = {
-              r: ((rgbInt >> 16) & 0xff) / 255,
-              g: ((rgbInt >> 8) & 0xff) / 255,
-              b: (rgbInt & 0xff) / 255
-            };
-            colors.push(rgb.r, rgb.g, rgb.b);
-          } else if (name === 'intensity' && colors.length === 0) {
-            // intensity to color using jet colormap
-            const intensity = dataView.getFloat32(byteOffset, !msg.is_bigendian) / 255;
-            const normalized = Math.max(0, Math.min(1, intensity));
-            
-            const r = Math.min(4 * normalized - 1.5, -4 * normalized + 4.5);
-            const g = Math.min(4 * normalized - 0.5, -4 * normalized + 3.5);
-            const b = Math.min(4 * normalized + 0.5, -4 * normalized + 2.5);
-            
-            intensities.push(
-              Math.max(0, Math.min(1, r)),
-              Math.max(0, Math.min(1, g)), 
-              Math.max(0, Math.min(1, b))
-            );
-          }
-          break;
-        case 6:
-          break;
-      }
-    });
+  // Cache field offsets
+  let xOffset = -1, yOffset = -1, zOffset = -1, rgbOffset = -1, intensityOffset = -1;
+  for (let f = 0; f < msg.fields.length; f++) {
+    const field = msg.fields[f];
+    switch (field.name) {
+      case 'x': xOffset = field.offset; break;
+      case 'y': yOffset = field.offset; break;
+      case 'z': zOffset = field.offset; break;
+      case 'rgb': rgbOffset = field.offset; break;
+      case 'intensity': intensityOffset = field.offset; break;
+    }
   }
-  // console.timeEnd('parsePointCloud');
 
-  return {
-    points,
-    colors: colors.length > 0 ? colors : intensities,
-  };
+  const count = msg.width;
+  const points = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  let posIdx = 0;
+  let colorIdx = 0;
+
+  for (let i = 0; i < count; i++) {
+    const base = i * msg.point_step;
+
+    if (xOffset >= 0) points[posIdx++] = dv.getFloat32(base + xOffset, littleEndian);
+    if (yOffset >= 0) points[posIdx++] = dv.getFloat32(base + yOffset, littleEndian);
+    if (zOffset >= 0) points[posIdx++] = dv.getFloat32(base + zOffset, littleEndian);
+
+    if (rgbOffset >= 0) {
+      const rgbInt = dv.getUint32(base + rgbOffset, littleEndian);
+      colors[colorIdx++] = ((rgbInt >> 16) & 0xff) / 255;
+      colors[colorIdx++] = ((rgbInt >> 8) & 0xff) / 255;
+      colors[colorIdx++] = (rgbInt & 0xff) / 255;
+    } else if (intensityOffset >= 0) {
+      const intensity = dv.getFloat32(base + intensityOffset, littleEndian) / 255;
+      const normalized = Math.max(0, Math.min(1, intensity));
+      const r = Math.min(4 * normalized - 1.5, -4 * normalized + 4.5);
+      const g = Math.min(4 * normalized - 0.5, -4 * normalized + 3.5);
+      const b = Math.min(4 * normalized + 0.5, -4 * normalized + 2.5);
+      colors[colorIdx++] = Math.max(0, Math.min(1, r));
+      colors[colorIdx++] = Math.max(0, Math.min(1, g));
+      colors[colorIdx++] = Math.max(0, Math.min(1, b));
+    } else {
+      colors[colorIdx++] = 1.0;
+      colors[colorIdx++] = 1.0;
+      colors[colorIdx++] = 1.0;
+    }
+  }
+
+  return { points, colors, count };
 };
 
 self.onmessage = (e: MessageEvent) => {

@@ -149,34 +149,18 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           decodedWith = "no worker";
           const t0 = performance.now();
 
-          const result = parsePointCloud(msg);
-          console.log("parsePointCloud took", performance.now() - t0, "ms");
-
-          // 复制点数据到Float32Array
-          const subStart = pointsLength,
-            subCount = result.points.length;
-
-          if (pointsLength + result.points.length > totalPointNumber) {
+          if (pointsLength + msg.width * 3 > totalPointNumber) {
             pointsLength = 0;
-          }
-
-          for (let i = 0; i < result.points.length; i++) {
-            allPoints[pointsLength + i] = result.points[i];
-          }
-
-          pointsLength += result.points.length;
-
-          // 复制颜色数据到Float32Array
-          if (colorsLength + result.colors.length > totalPointNumber) {
             colorsLength = 0;
           }
 
-          for (let i = 0; i < result.colors.length; i++) {
-            allColors[colorsLength + i] = result.colors[i];
-          }
-          colorsLength += result.colors.length;
+          const subStart = pointsLength;
+          const count = parsePointCloud(msg, allPoints, allColors, pointsLength / 3);
+          const subCount = count * 3;
+          pointsLength += subCount;
+          colorsLength += subCount;
 
-          console.timeEnd("parsePointCloud");
+          console.log("parsePointCloud took", performance.now() - t0, "ms", "count:", count);
 
           // console.time("renderPoints");
 
@@ -432,33 +416,19 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           decodedWith = "worker1: onmessage";
 
           // console.time("worker/allPoints");
-          const { points, colors } = e.data;
+          const { points, colors, count } = e.data;
+          const subCount = count * 3;
 
-          // 复制点数据到Float32Array
-          const subStart = pointsLength,
-            subCount = points.length;
-
-          if (pointsLength + points.length > totalPointNumber) {
+          if (pointsLength + subCount > totalPointNumber) {
             pointsLength = 0;
-          }
-
-          for (let i = 0; i < points.length; i++) {
-            allPoints[pointsLength + i] = points[i];
-          }
-
-          pointsLength += points.length;
-
-          // 复制颜色数据到Float32Array
-          if (colorsLength + colors.length > totalPointNumber) {
             colorsLength = 0;
           }
 
-          for (let i = 0; i < colors.length; i++) {
-            allColors[colorsLength + i] = colors[i];
-          }
-          colorsLength += colors.length;
-
-          // console.timeEnd("parsePointCloud");
+          const subStart = pointsLength;
+          allPoints.set(points, pointsLength);
+          allColors.set(colors, colorsLength);
+          pointsLength += subCount;
+          colorsLength += subCount;
 
           // console.time("renderPoints");
 
@@ -550,36 +520,49 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
         }
         function parsePointCloud(msg) {
           var bytes = getPointCloudData(msg.data);
-          var dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-          var points = [];
-          var colors = [];
-          for (let i = 0; i < msg.width; i++) {
-            var pointOffset = i * msg.point_step;
-            msg.fields.forEach((field) => {
-                var byteOffset = pointOffset + field.offset;
-                var name = field.name;
-                switch (field.datatype) {
-                    case 7:
-                        if (name === 'x' || name === 'y' || name === 'z') {
-                            points.push(dataView.getFloat32(byteOffset, !msg.is_bigendian));
-                        } else if (name === 'rgb') {
-                            var rgbInt = dataView.getUint32(byteOffset, !msg.is_bigendian);
-                            var rgb = {
-                                r: ((rgbInt >> 16) & 0xff) / 255,
-                                g: ((rgbInt >> 8) & 0xff) / 255,
-                                b: (rgbInt & 0xff) / 255
-                            };
-                            colors.push(rgb.r, rgb.g, rgb.b);
-                        }
-                        break;
-                      }
-                  });
-                }
-            return {
-              points,
-              colors
-            };
+          var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+          var littleEndian = !msg.is_bigendian;
+          var xOffset = -1, yOffset = -1, zOffset = -1, rgbOffset = -1, intensityOffset = -1;
+          for (var f = 0; f < msg.fields.length; f++) {
+            var field = msg.fields[f];
+            if (field.name === 'x') xOffset = field.offset;
+            else if (field.name === 'y') yOffset = field.offset;
+            else if (field.name === 'z') zOffset = field.offset;
+            else if (field.name === 'rgb') rgbOffset = field.offset;
+            else if (field.name === 'intensity') intensityOffset = field.offset;
           }
+          var count = msg.width;
+          var points = new Float32Array(count * 3);
+          var colors = new Float32Array(count * 3);
+          var posIdx = 0;
+          var colorIdx = 0;
+          for (var i = 0; i < count; i++) {
+            var base = i * msg.point_step;
+            if (xOffset >= 0) points[posIdx++] = dv.getFloat32(base + xOffset, littleEndian);
+            if (yOffset >= 0) points[posIdx++] = dv.getFloat32(base + yOffset, littleEndian);
+            if (zOffset >= 0) points[posIdx++] = dv.getFloat32(base + zOffset, littleEndian);
+            if (rgbOffset >= 0) {
+              var rgbInt = dv.getUint32(base + rgbOffset, littleEndian);
+              colors[colorIdx++] = ((rgbInt >> 16) & 0xff) / 255;
+              colors[colorIdx++] = ((rgbInt >> 8) & 0xff) / 255;
+              colors[colorIdx++] = (rgbInt & 0xff) / 255;
+            } else if (intensityOffset >= 0) {
+              var intensity = dv.getFloat32(base + intensityOffset, littleEndian) / 255;
+              var normalized = Math.max(0, Math.min(1, intensity));
+              var r = Math.min(4 * normalized - 1.5, -4 * normalized + 4.5);
+              var g = Math.min(4 * normalized - 0.5, -4 * normalized + 3.5);
+              var b = Math.min(4 * normalized + 0.5, -4 * normalized + 2.5);
+              colors[colorIdx++] = Math.max(0, Math.min(1, r));
+              colors[colorIdx++] = Math.max(0, Math.min(1, g));
+              colors[colorIdx++] = Math.max(0, Math.min(1, b));
+            } else {
+              colors[colorIdx++] = 1.0;
+              colors[colorIdx++] = 1.0;
+              colors[colorIdx++] = 1.0;
+            }
+          }
+          return { points, colors, count };
+        }
   
         self.onmessage = (e) => {
             const result = parsePointCloud(e.data);
@@ -604,35 +587,19 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           } else {
             decodedWith = "worker2: onmessage";
             // console.time("worker2/allPoints");
-            const { points, colors } = e.data;
+            const { points, colors, count } = e.data;
+            const subCount = count * 3;
 
-            // console.time("worker/allPoints");
-
-            // 复制点数据到Float32Array
-            const subStart = pointsLength,
-              subCount = points.length;
-
-            if (pointsLength + points.length > totalPointNumber) {
+            if (pointsLength + subCount > totalPointNumber) {
               pointsLength = 0;
-            }
-
-            for (let i = 0; i < points.length; i++) {
-              allPoints[pointsLength + i] = points[i];
-            }
-
-            pointsLength += points.length;
-
-            // 复制颜色数据到Float32Array
-            if (colorsLength + colors.length > totalPointNumber) {
               colorsLength = 0;
             }
 
-            for (let i = 0; i < colors.length; i++) {
-              allColors[colorsLength + i] = colors[i];
-            }
-            colorsLength += colors.length;
-
-            console.timeEnd("parsePointCloud");
+            const subStart = pointsLength;
+            allPoints.set(points, pointsLength);
+            allColors.set(colors, colorsLength);
+            pointsLength += subCount;
+            colorsLength += subCount;
 
             // console.time("renderPoints");
 
@@ -1090,62 +1057,57 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
     };
   }, []);
 
-  const parsePointCloud = (msg: any) => {
-    console.log("not from web worker");
+  const parsePointCloud = (msg: any, positions: Float32Array, colors: Float32Array, startPointIdx: number): number => {
     const bytes = getPointCloudData(msg.data);
-    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const littleEndian = !msg.is_bigendian;
 
-    const points: number[] = [];
-    const colors: number[] = [];
-    const intensities: number[] = [];
-
-    for (let i = 0; i < msg.width; i++) {
-      const pointOffset = i * msg.point_step;
-
-      msg.fields.forEach((field: any) => {
-        const byteOffset = pointOffset + field.offset;
-        const name = field.name;
-
-        switch (field.datatype) {
-          case 7: // FLOAT32 (x/y/z) // UINT32 (rgb)
-            if (name === "x" || name === "y" || name === "z") {
-              points.push(dataView.getFloat32(byteOffset, !msg.is_bigendian));
-            } else if (name === "rgb") {
-              const rgbInt = dataView.getUint32(byteOffset, !msg.is_bigendian);
-              const rgb = {
-                r: ((rgbInt >> 16) & 0xff) / 255,
-                g: ((rgbInt >> 8) & 0xff) / 255,
-                b: (rgbInt & 0xff) / 255,
-              };
-              colors.push(rgb.r, rgb.g, rgb.b);
-            } else if (name === "intensity" && colors.length === 0) {
-              // intensity to color using jet colormap
-              const intensity =
-                dataView.getFloat32(byteOffset, !msg.is_bigendian) / 255;
-              const normalized = Math.max(0, Math.min(1, intensity));
-
-              const r = Math.min(4 * normalized - 1.5, -4 * normalized + 4.5);
-              const g = Math.min(4 * normalized - 0.5, -4 * normalized + 3.5);
-              const b = Math.min(4 * normalized + 0.5, -4 * normalized + 2.5);
-
-              intensities.push(
-                Math.max(0, Math.min(1, r)),
-                Math.max(0, Math.min(1, g)),
-                Math.max(0, Math.min(1, b))
-              );
-            }
-            break;
-          case 6:
-            break;
-        }
-      });
+    // Cache field offsets
+    let xOffset = -1, yOffset = -1, zOffset = -1, rgbOffset = -1, intensityOffset = -1;
+    for (let f = 0; f < msg.fields.length; f++) {
+      const field = msg.fields[f];
+      switch (field.name) {
+        case 'x': xOffset = field.offset; break;
+        case 'y': yOffset = field.offset; break;
+        case 'z': zOffset = field.offset; break;
+        case 'rgb': rgbOffset = field.offset; break;
+        case 'intensity': intensityOffset = field.offset; break;
+      }
     }
-    // console.timeEnd('parsePointCloud');
 
-    return {
-      points,
-      colors: colors.length > 0 ? colors : intensities,
-    };
+    const maxPts = Math.min(msg.width, (positions.length / 3) - startPointIdx);
+    let posIdx = startPointIdx * 3;
+    let colorIdx = startPointIdx * 3;
+
+    for (let i = 0; i < maxPts; i++) {
+      const base = i * msg.point_step;
+
+      if (xOffset >= 0) positions[posIdx++] = dv.getFloat32(base + xOffset, littleEndian);
+      if (yOffset >= 0) positions[posIdx++] = dv.getFloat32(base + yOffset, littleEndian);
+      if (zOffset >= 0) positions[posIdx++] = dv.getFloat32(base + zOffset, littleEndian);
+
+      if (rgbOffset >= 0) {
+        const rgbInt = dv.getUint32(base + rgbOffset, littleEndian);
+        colors[colorIdx++] = ((rgbInt >> 16) & 0xff) / 255;
+        colors[colorIdx++] = ((rgbInt >> 8) & 0xff) / 255;
+        colors[colorIdx++] = (rgbInt & 0xff) / 255;
+      } else if (intensityOffset >= 0) {
+        const intensity = dv.getFloat32(base + intensityOffset, littleEndian) / 255;
+        const normalized = Math.max(0, Math.min(1, intensity));
+        const r = Math.min(4 * normalized - 1.5, -4 * normalized + 4.5);
+        const g = Math.min(4 * normalized - 0.5, -4 * normalized + 3.5);
+        const b = Math.min(4 * normalized + 0.5, -4 * normalized + 2.5);
+        colors[colorIdx++] = Math.max(0, Math.min(1, r));
+        colors[colorIdx++] = Math.max(0, Math.min(1, g));
+        colors[colorIdx++] = Math.max(0, Math.min(1, b));
+      } else {
+        colors[colorIdx++] = 1.0;
+        colors[colorIdx++] = 1.0;
+        colors[colorIdx++] = 1.0;
+      }
+    }
+
+    return maxPts;
   };
 
   // 添加更新轨迹的函数
