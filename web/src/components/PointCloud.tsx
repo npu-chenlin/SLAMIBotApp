@@ -216,6 +216,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           // console.timeEnd("renderPoints");
         }
       }
+    }
     );
 
     try {
