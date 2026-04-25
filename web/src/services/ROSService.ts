@@ -9,7 +9,7 @@ export interface ROSServiceInterface {
   disconnect: () => void;
   isConnected: () => boolean;
   getROSInstance: () => ROSLIB.Ros | null;
-  subscribeTopic: <T>(topicName: string, messageType: string, callback: (message: T) => void) => ROSLIB.Topic;
+  subscribeTopic: <T>(topicName: string, messageType: string, callback: (message: T) => void, compression?: string) => ROSLIB.Topic;
   unsubscribeTopic: (topic: ROSLIB.Topic) => void;
   createTFClient: (options: Omit<ROSLIB.TFClientOptions, 'ros'>) => ROSLIB.TFClient;
   onConnectionChange: (callback: (status: ROSConnectionStatus) => void) => () => void;
@@ -92,7 +92,7 @@ class ROSService implements ROSServiceInterface {
   }
 
   // 订阅话题
-  subscribeTopic<T>(topicName: string, messageType: string, callback: (message: T) => void): ROSLIB.Topic {
+  subscribeTopic<T>(topicName: string, messageType: string, callback: (message: T) => void, compression?: string): ROSLIB.Topic {
     if (!this.ros) {
       throw new Error('ROS not connected. Please connect first.');
     }
@@ -100,7 +100,8 @@ class ROSService implements ROSServiceInterface {
     const topic = new ROSLIB.Topic({
       ros: this.ros,
       name: topicName,
-      messageType: messageType
+      messageType: messageType,
+      compression: compression || 'none'
     });
 
     topic.subscribe((message: T) => {

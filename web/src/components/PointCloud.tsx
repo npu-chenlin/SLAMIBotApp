@@ -153,6 +153,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
   const firstPersonCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
+  const pointCloudTopicRef = useRef<ROSLIB.Topic | null>(null);
   const odometryListenerRef = useRef<ROSLIB.Topic | null>(null);
   // 添加轨迹点数组引用
   const trajectoryPointsRef = useRef<THREE.Vector3[]>([]);
@@ -189,71 +190,80 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
     const ros = rosService.getROSInstance();
 
-    // 订阅点云话题
-    ros?.on(topic, (msg: any) => {
-      if (rosService.isConnected()) {
-        if (workerRef.current) {
-          workerRef.current.postMessage(msg);
+    // 订阅点云话题（启用 CBOR 压缩传输）
+    if (ros) {
+      pointCloudTopicRef.current = new ROSLIB.Topic({
+        ros: ros,
+        name: topic,
+        messageType: 'sensor_msgs/PointCloud2',
+        compression: 'cbor'
+      });
 
-          decodedWith = "worker: postMessage";
-        } else {
-          decodedWith = "no worker";
-          const t0 = performance.now();
+      pointCloudTopicRef.current.subscribe((msg: any) => {
+        if (rosService.isConnected()) {
+          if (workerRef.current) {
+            workerRef.current.postMessage(msg);
 
-          if (pointsLength + msg.width * 3 > totalPointNumber) {
-            pointsLength = 0;
-            colorsLength = 0;
+            decodedWith = "worker: postMessage";
+          } else {
+            decodedWith = "no worker";
+            const t0 = performance.now();
+
+            if (pointsLength + msg.width * 3 > totalPointNumber) {
+              pointsLength = 0;
+              colorsLength = 0;
+            }
+
+            const subStart = pointsLength;
+            const count = parsePointCloud(msg, allPoints, allColors, pointsLength / 3);
+            const subCount = count * 3;
+            pointsLength += subCount;
+            colorsLength += subCount;
+
+            console.log("parsePointCloud took", performance.now() - t0, "ms", "count:", count);
+
+            // console.time("renderPoints");
+
+            if (!particlesGeometry.attributes.position) {
+              particlesGeometry.setAttribute(
+                "position",
+                new THREE.BufferAttribute(allPoints, 3)
+              );
+            }
+
+            if (!particlesGeometry.attributes.color) {
+              particlesGeometry.setAttribute(
+                "color",
+                new THREE.BufferAttribute(allColors, 3)
+              );
+            }
+
+            (
+              particlesGeometry.attributes.position as THREE.BufferAttribute
+            ).updateRanges = [
+              {
+                start: subStart,
+                count: subCount,
+              },
+            ];
+
+            (
+              particlesGeometry.attributes.color as THREE.BufferAttribute
+            ).updateRanges = [
+              {
+                start: subStart,
+                count: subCount,
+              },
+            ];
+
+            particlesGeometry.attributes.position.needsUpdate = true;
+            particlesGeometry.attributes.color.needsUpdate = true;
+
+            // console.timeEnd("renderPoints");
           }
-
-          const subStart = pointsLength;
-          const count = parsePointCloud(msg, allPoints, allColors, pointsLength / 3);
-          const subCount = count * 3;
-          pointsLength += subCount;
-          colorsLength += subCount;
-
-          console.log("parsePointCloud took", performance.now() - t0, "ms", "count:", count);
-
-          // console.time("renderPoints");
-
-          if (!particlesGeometry.attributes.position) {
-            particlesGeometry.setAttribute(
-              "position",
-              new THREE.BufferAttribute(allPoints, 3)
-            );
-          }
-
-          if (!particlesGeometry.attributes.color) {
-            particlesGeometry.setAttribute(
-              "color",
-              new THREE.BufferAttribute(allColors, 3)
-            );
-          }
-
-          (
-            particlesGeometry.attributes.position as THREE.BufferAttribute
-          ).updateRanges = [
-            {
-              start: subStart,
-              count: subCount,
-            },
-          ];
-
-          (
-            particlesGeometry.attributes.color as THREE.BufferAttribute
-          ).updateRanges = [
-            {
-              start: subStart,
-              count: subCount,
-            },
-          ];
-
-          particlesGeometry.attributes.position.needsUpdate = true;
-          particlesGeometry.attributes.color.needsUpdate = true;
-
-          // console.timeEnd("renderPoints");
         }
-      }
-    });
+      });
+    }
 
     try {
       if (rosService.isConnected()) {
@@ -350,16 +360,17 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
           transThres: 0.01,
         });
 
-        // 使用ROS3D处理点云数据（订阅CBOR二进制流，触发ROSBridge推送）
-        const ros = rosService.getROSInstance();
-        if (ros) {
-          new ROS3D.PointCloud2({
-            ros: ros!,
-            topic: topic,
-            tfClient: tfClientRef.current,
-            max_pts: 100000,
-          });
-        }
+        // 使用ROS3D处理点云数据（已禁用其内部渲染，仅保留TF客户端）
+        // 注意：点云订阅已由上方 ROSLIB.Topic 接管，并启用了 CBOR 压缩
+        // const ros = rosService.getROSInstance();
+        // if (ros) {
+        //   new ROS3D.PointCloud2({
+        //     ros: ros!,
+        //     topic: topic,
+        //     tfClient: tfClientRef.current,
+        //     max_pts: 100000,
+        //   });
+        // }
       }
     } catch (error) {
       console.error("设置电池状态订阅时出错:", error);
@@ -422,6 +433,11 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
 
   // 清理订阅
   const cleanupSubscribers = () => {
+    if (pointCloudTopicRef.current) {
+      pointCloudTopicRef.current.unsubscribe();
+      pointCloudTopicRef.current = null;
+    }
+
     if (odometryListenerRef.current) {
       rosService.unsubscribeTopic(odometryListenerRef.current);
       odometryListenerRef.current = null;

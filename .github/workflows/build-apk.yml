@@ -83,12 +83,20 @@ jobs:
 
       - name: Generate changelog
         run: |
-          # 如果是 tag 触发，从 tag message 读取描述；否则自动生成
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "SLAMIBot Android App v$VERSION" > /tmp/desc.txt
+          echo "" >> /tmp/desc.txt
+          # 如果是 tag 触发，收集两次 tag 之间的所有 commit
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            git for-each-ref --format='%(contents)' "${{ github.ref }}" > /tmp/desc.txt
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              echo "更新内容（$PREV_TAG → v$VERSION）：" >> /tmp/desc.txt
+              git log --oneline "$PREV_TAG..HEAD" | sed 's/^/- /' >> /tmp/desc.txt
+            else
+              echo "更新内容：" >> /tmp/desc.txt
+              git log --oneline -n 10 | sed 's/^/- /' >> /tmp/desc.txt
+            fi
           else
-            echo "SLAMIBot Android App v${{ steps.version.outputs.version }}" > /tmp/desc.txt
-            echo "" >> /tmp/desc.txt
             echo "最近更新：" >> /tmp/desc.txt
             git log --oneline -n 5 | sed 's/^/- /' >> /tmp/desc.txt
           fi

@@ -14,6 +14,11 @@ declare module 'roslib' {
     ros: Ros;
     name: string;
     messageType: string;
+    compression?: string;
+    throttle_rate?: number;
+    queue_length?: number;
+    queue_size?: number;
+    latch?: boolean;
   }
 
   export class Ros {
