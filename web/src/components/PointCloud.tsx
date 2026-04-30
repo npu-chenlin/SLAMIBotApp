@@ -1086,7 +1086,7 @@ const PointCloud = forwardRef<PointCloudRef, PointCloudProps>(({
             deviceModelRef.current.quaternion
           );
 
-          const cameraOffset = new THREE.Vector3(-5, 0, 1);
+          const cameraOffset = new THREE.Vector3(-8, 0, 3);
 
           const cameraPosition = new THREE.Vector3().copy(
             deviceModelRef.current.position
