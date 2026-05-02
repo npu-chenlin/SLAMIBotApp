@@ -57,6 +57,7 @@ android {
 dependencies {
     // WebView Asset Loader
     implementation("androidx.webkit:webkit:1.8.0")
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

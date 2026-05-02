@@ -420,3 +420,169 @@
   border-radius: 4px;
   display: inline-block;
 }
+
+/* RTK认证按钮样式 */
+.rtk-auth-button {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.rtk-auth-button:hover {
+  background-color: #1976D2;
+}
+
+.rtk-auth-button:disabled {
+  background-color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+/* RTK认证结果样式 */
+.rtk-auth-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.rtk-auth-result.success {
+  background-color: rgba(76, 175, 80, 0.2);
+  border: 1px solid #4CAF50;
+}
+
+.rtk-auth-result.error {
+  background-color: rgba(244, 67, 54, 0.2);
+  border: 1px solid #f44336;
+}
+
+.rtk-auth-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.rtk-auth-result.success .rtk-auth-icon {
+  color: #4CAF50;
+}
+
+.rtk-auth-result.error .rtk-auth-icon {
+  color: #f44336;
+}
+
+.rtk-auth-message {
+  font-size: 13px;
+  color: #ddd;
+}
+
+/* RTK按钮组样式 */
+.rtk-button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.rtk-button-group .rtk-auth-button,
+.rtk-button-group .rtk-stop-button {
+  flex: 1;
+}
+
+/* RTK停止按钮样式 */
+.rtk-stop-button {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.rtk-stop-button:hover {
+  background-color: #d32f2f;
+}
+
+.rtk-stop-button:disabled {
+  background-color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+/* RTK状态行样式 */
+.rtk-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.rtk-status-label {
+  font-size: 13px;
+  color: #ddd;
+}
+
+.rtk-status-value {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.rtk-status-value.connected {
+  color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.rtk-status-value.partial {
+  color: #FF9800;
+  background-color: rgba(255, 152, 0, 0.2);
+}
+
+.rtk-status-value.disconnected {
+  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.2);
+}
+
+/* 网络状态指示器 */
+.network-strength {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.network-strength-bar {
+  width: 3px;
+  background-color: #666;
+  border-radius: 1px;
+}
+
+.network-strength-bar.active {
+  background-color: #4CAF50;
+}
+
+.network-strength-bar:nth-child(1) { height: 4px; }
+.network-strength-bar:nth-child(2) { height: 6px; }
+.network-strength-bar:nth-child(3) { height: 8px; }
+.network-strength-bar:nth-child(4) { height: 10px; }
+
+/* 弱信号 */
+.network-strength.weak .network-strength-bar.active:nth-child(1) { background-color: #f44336; }
+.network-strength.weak .network-strength-bar.active:nth-child(2) { background-color: #f44336; }
+
+/* 中等信号 */
+.network-strength.medium .network-strength-bar.active { background-color: #FF9800; }
+
+/* 强信号 */
+.network-strength.strong .network-strength-bar.active { background-color: #4CAF50; }

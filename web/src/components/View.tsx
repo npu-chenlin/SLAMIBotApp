@@ -341,10 +341,14 @@ const View = () => {
     showStats: true, // 添加showStats配置项
     maxPointNumber: 3000000, // 添加showStats配置项
     rtkHost: "",
-    rtkPort: "2101",
+    rtkPort: "",
     rtkUser: "",
     rtkPassword: "",
     rtkMountPoint: "",
+    rtkRosbridgeUrl: "",
+    rtkGgaLat: "",
+    rtkGgaLon: "",
+    rtkGgaAlt: "",
   });
 
   // 添加debugInfo状态

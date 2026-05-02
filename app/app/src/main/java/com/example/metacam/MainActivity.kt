@@ -307,6 +307,7 @@ class MainActivity : ComponentActivity() {
     // 存储WebView引用，用于在下载进度更新时调用JavaScript
     companion object {
         var webViewRef: WebView? = null
+        private var rtkJSInterface: RtkJSInterface? = null
     }
     
     // 存储权限请求
@@ -317,6 +318,15 @@ class MainActivity : ComponentActivity() {
             Log.d("Permission", "存储权限已授予")
         } else {
             Log.e("Permission", "存储权限被拒绝，无法保存文件到外部存储")
+        }
+    }
+    
+    // 多权限请求（位置权限）
+    private val requestMultiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        permissions.entries.forEach { entry ->
+            Log.d("Permission", "${entry.key} = ${entry.value}")
         }
     }
     
@@ -492,11 +502,11 @@ class MainActivity : ComponentActivity() {
         
         // 注册下载完成的广播接收器
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13及以上版本需要指定RECEIVER_EXPORTED标志
+            // Android 13及以上版本需要指定RECEIVER_NOT_EXPORTED标志（系统广播）
             registerReceiver(
                 downloadCompleteReceiver,
                 IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                Context.RECEIVER_EXPORTED
+                Context.RECEIVER_NOT_EXPORTED
             )
         } else {
             registerReceiver(
@@ -504,6 +514,14 @@ class MainActivity : ComponentActivity() {
                 IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             )
         }
+        
+        // 启动RTK服务
+        val serviceIntent = Intent(this, RtkService::class.java)
+        startService(serviceIntent)
+        Log.i("MainActivity", "RTK服务已启动")
+        
+        // 初始化RTK JavaScript接口
+        rtkJSInterface = RtkJSInterface(this)
         
         // Configurar pantalla completa
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -536,6 +554,15 @@ class MainActivity : ComponentActivity() {
         // 移除Handler回调
         handler.removeCallbacks(progressRunnable)
         
+        // 清理RTK资源
+        rtkJSInterface?.cleanup()
+        rtkJSInterface = null
+        
+        // 停止RTK服务
+        val serviceIntent = Intent(this, RtkService::class.java)
+        stopService(serviceIntent)
+        Log.i("MainActivity", "RTK服务已停止")
+        
         // 清除WebView引用
         webViewRef = null
     }
@@ -557,6 +584,37 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        
+        // 请求位置权限（用于获取WiFi SSID）
+        checkAndRequestLocationPermission()
+    }
+    
+    // 检查并请求位置权限
+    private fun checkAndRequestLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val fineLocationGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            val coarseLocationGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            if (!fineLocationGranted || !coarseLocationGranted) {
+                // 请求位置权限
+                requestMultiplePermissionsLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+                Log.d("Permission", "请求位置权限")
+            } else {
+                Log.d("Permission", "已有位置权限")
+            }
+        }
     }
 }
 
@@ -570,6 +628,15 @@ fun WebViewContent() {
                 // 首先添加JavaScript接口
                 val firmwareJSInterface = FirmwareJSInterface(context)
                 addJavascriptInterface(firmwareJSInterface, "Android")
+                
+                // 添加RTK JavaScript接口
+                val rtkInterface = RtkJSInterface(context)
+                addJavascriptInterface(rtkInterface, "AndroidRtk")
+                RtkJSInterface.setWebViewRef(this)
+                
+                // 添加Network JavaScript接口
+                val networkInterface = NetworkJSInterface(context)
+                addJavascriptInterface(networkInterface, "AndroidNetwork")
                 
                 // 设置WebView引用，用于更新上传进度
                 FirmwareJSInterface.setWebViewRef(this)
